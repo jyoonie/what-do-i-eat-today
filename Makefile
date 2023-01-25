@@ -12,3 +12,9 @@ drun:
 
 database:
 	docker run -d -p 5432:5432 --network jynet --name wdiet_db -e POSTGRES_PASSWORD=secret postgres:alpine
+
+migrateup:
+	goose -dir ./store/postgres/migrations postgres "user=postgres password=secret port=5432 dbname=postgres sslmode=disable" up
+
+migratedown:
+	goose -dir ./store/postgres/migrations postgres "user=postgres password=secret port=5432 dbname=postgres sslmode=disable" down
