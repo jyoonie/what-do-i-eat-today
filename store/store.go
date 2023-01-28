@@ -15,4 +15,6 @@ type Store interface { //keeping a strict separation between the layers of your 
 	//The other benefit of having store interface is certainly that you can switch between databases that fulfill your store interface.
 	Ping() error
 	GetUser(ctx context.Context, id uuid.UUID) (*User, error)
+	CreateUser(ctx context.Context, u User) (*User, error)
+	UpdateUser(ctx context.Context, u User) (*User, error)
 }

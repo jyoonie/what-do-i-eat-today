@@ -43,3 +43,85 @@ func (pg *PG) GetUser(ctx context.Context, id uuid.UUID) (*store.User, error) {
 
 	return &u, nil
 }
+
+func (pg *PG) CreateUser(ctx context.Context, u store.User) (*store.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating user: %w", err)
+	}
+
+	var user store.User
+
+	row := tx.QueryRowContext(ctx, sqlCreateUser, //여기서 sqlCreateUser를 부를 때, initial_migrations의 user_uuid uuid not null default gen_random_uuid()가 실행됨. 그래서 자동으로 user_uuid 필드에 채워짐. 참고로, 여기서는 row를 create하고 그 필드들을 arg로 받은 값들로 채우고, 나머지 필드들은 default로 채움.
+		u.HashedPassword,
+		u.Active,
+		u.FirstName,
+		u.LastName,
+		u.EmailAddress,
+	)
+
+	if err = row.Scan( //여기선 위에서 생성된 row를 scan해서 user에 복붙?한다음 그 user의 주소를 return하는고지..
+		&user.UserUUID,
+		&user.HashedPassword,
+		&user.Active,
+		&user.FirstName,
+		&user.LastName,
+		&user.EmailAddress,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error creating user: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error creating user: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (pg *PG) UpdateUser(ctx context.Context, u store.User) (*store.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error updating user: %w", err)
+	}
+
+	var user store.User
+
+	row := tx.QueryRowContext(ctx, sqlUpdateUser,
+		u.Active,
+		u.FirstName,
+		u.LastName,
+		u.EmailAddress,
+		u.UserUUID,
+	)
+
+	if err = row.Scan( //여기선 위에서 생성된 row를 scan해서 user에 복붙?한다음 그 user의 주소를 return하는고지..
+		&user.UserUUID,
+		&user.HashedPassword,
+		&user.Active,
+		&user.FirstName,
+		&user.LastName,
+		&user.EmailAddress,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error updating user: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error updating user: %w", err)
+	}
+
+	return &user, nil
+}

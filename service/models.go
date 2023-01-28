@@ -17,3 +17,8 @@ type User struct {
 	//CreatedAt    time.Time `json:"created_at,omitempty"`
 	//UpdatedAt    time.Time `json:"updated_at,omitempty"`
 }
+
+type Login struct {
+	EmailAddress string `json:"email_address,omitempty"`
+	Password     string `json:"password,omitempty"`
+}
