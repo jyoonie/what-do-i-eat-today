@@ -114,6 +114,10 @@ func (pg *PG) UpdateUser(ctx context.Context, u store.User) (*store.User, error)
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			tx.Rollback()
+			return nil, store.ErrNotFound
+		}
 		tx.Rollback()
 		return nil, fmt.Errorf("error updating user: %w", err)
 	}
@@ -124,4 +128,173 @@ func (pg *PG) UpdateUser(ctx context.Context, u store.User) (*store.User, error)
 	}
 
 	return &user, nil
+}
+
+func (pg *PG) GetIngredient(ctx context.Context, id uuid.UUID) (*store.Ingredient, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var i store.Ingredient
+
+	row := pg.db.QueryRowContext(ctx, sqlGetIngredient, id)
+	if err := row.Scan(
+		&i.IngredientUUID,
+		&i.IngredientName,
+		&i.Category,
+		&i.DaysUntilExp,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, fmt.Errorf("error getting ingredient: %w", err)
+	}
+
+	return &i, nil
+}
+
+func (pg *PG) CreateIngredient(ctx context.Context, i store.Ingredient) (*store.Ingredient, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating ingredient: %w", err)
+	}
+
+	var ingredient store.Ingredient
+
+	row := tx.QueryRowContext(ctx, sqlCreateIngredient,
+		&i.IngredientUUID,
+		&i.IngredientName,
+		&i.Category,
+		&i.DaysUntilExp,
+	)
+
+	if err = row.Scan(
+		&ingredient.IngredientUUID,
+		&ingredient.IngredientName,
+		&ingredient.Category,
+		&ingredient.DaysUntilExp,
+		&ingredient.CreatedAt,
+		&ingredient.UpdatedAt,
+	); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error creating ingredient: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error creating ingredient: %w", err)
+	}
+
+	return &ingredient, nil
+}
+
+func (pg *PG) UpdateIngredient(ctx context.Context, i store.Ingredient) (*store.Ingredient, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error updating ingredient: %w", err)
+	}
+
+	var ingredient store.Ingredient
+
+	row := tx.QueryRowContext(ctx, sqlUpdateIngredient,
+		i.IngredientName,
+		i.Category,
+		i.DaysUntilExp,
+		i.IngredientUUID,
+	)
+
+	if err = row.Scan(
+		&ingredient.IngredientUUID,
+		&ingredient.IngredientName,
+		&ingredient.Category,
+		&ingredient.DaysUntilExp,
+		&ingredient.CreatedAt,
+		&ingredient.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			tx.Rollback()
+			return nil, store.ErrNotFound
+		}
+		tx.Rollback()
+		return nil, fmt.Errorf("error updating ingredient: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error updating ingredient: %w", err)
+	}
+
+	return &ingredient, nil
+}
+
+func (pg *PG) DeleteIngredient(ctx context.Context, id uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel() //it defers cancel until it returns from an error(actually, until it returns from current function, even john doesn't know what will happen after you return without an error. Does cancel() execute?) So what does it do? It cancels the context everywhere, so you don't do extra work when you know it's gonna fail. Context is per request.
+
+	//writing to or deleting from db, you should be in a transaction
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting ingredient: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, sqlDeleteIngredient, id)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting ingredient: %w", err)
+	}
+
+	if affected, _ := res.RowsAffected(); affected != 1 {
+		tx.Rollback()
+		return fmt.Errorf("error deleting ingredient, rows affected is %d instead of 1", affected)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting ingredient: %w", err)
+	}
+
+	return nil
+}
+
+func (pg *PG) SearchIngredients(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var ingredients []store.Ingredient
+
+	rows, err := pg.db.QueryContext(ctx, sqlsearchIngredients, i)
+	if err != nil {
+		return nil, fmt.Errorf("error searching ingredient: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var i store.Ingredient
+		if err := rows.Scan(
+			&i.IngredientUUID,
+			&i.IngredientName,
+			&i.Category,
+			&i.DaysUntilExp,
+		); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, store.ErrNotFound
+			}
+			return nil, fmt.Errorf("error searching ingredient: %w", err)
+		}
+		ingredients = append(ingredients, i)
+	}
+	// if err := rows.Close(); err != nil {
+	// 	return nil, err
+	// }
+	// if err := rows.Err(); err != nil {
+	// 	return nil, err
+	// }
+	return ingredients, nil
 }

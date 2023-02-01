@@ -45,7 +45,7 @@ func TestPing(t *testing.T) {
 			testServer.r.ServeHTTP(w, req)
 
 			assert.Equal(t, testcase.expectedResponseStatus, w.Code)
-			assert.Equal(t, testcase.expectedResponseBody, w.Body.String())
+			assert.Equal(t, testcase.expectedResponseBody, w.Body.String()) //여기선 json message를 담을 struct 구조가 없으니까 걍 json 비교해..
 		})
 	}
 }
@@ -71,9 +71,7 @@ func TestGetUser(t *testing.T) {
 		},
 		{
 			"badRequest",
-			func(ctx context.Context, id uuid.UUID) (*store.User, error) {
-				return nil, nil
-			},
+			nil,
 			"badrequesthehehe",
 			nil,
 			http.StatusBadRequest,
@@ -155,9 +153,7 @@ func TestCreateUser(t *testing.T) {
 		},
 		{
 			"badRequest",
-			func(ctx context.Context, u store.User) (*store.User, error) {
-				return nil, nil
-			},
+			nil,
 			badUserRequest,
 			nil,
 			http.StatusBadRequest,
@@ -237,9 +233,7 @@ func TestUpdateUser(t *testing.T) {
 		},
 		{
 			"badRequest",
-			func(ctx context.Context, u store.User) (*store.User, error) {
-				return nil, nil
-			},
+			nil,
 			badUserRequest,
 			nil,
 			http.StatusBadRequest,
@@ -279,6 +273,342 @@ func TestUpdateUser(t *testing.T) {
 				assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
 				assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
 				assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestGetIngredient(t *testing.T) {
+	testcases := []struct {
+		name                      string
+		getIngredientOverrideFunc func(ctx context.Context, id uuid.UUID) (*store.Ingredient, error)
+		requestBody               string
+		expectedResponse          *Ingredient
+		expectedStatus            int
+	}{
+		{
+			"happyPath",
+			nil,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			&Ingredient{
+				IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+				IngredientName: "onion",
+				Category:       "vegetables",
+				DaysUntilExp:   7},
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			"maerong",
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, id uuid.UUID) (*store.Ingredient, error) {
+				return nil, errors.New("internalservererror")
+			},
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/ingredients/"+testcase.requestBody, nil)
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{GetIngredientOverride: testcase.getIngredientOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			var resBody Ingredient
+
+			if testcase.expectedResponse != nil {
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
+				assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
+				assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
+				assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestCreateIngredient(t *testing.T) {
+	goodIngredient := Ingredient{
+		IngredientName: "onion",
+		Category:       "vegetables",
+		DaysUntilExp:   7,
+	}
+
+	badIngredient := Ingredient{
+		IngredientName: "",
+		Category:       "",
+		DaysUntilExp:   7,
+	}
+
+	testcases := []struct {
+		name                         string
+		createIngredientOverrideFunc func(ctx context.Context, i store.Ingredient) (*store.Ingredient, error)
+		requestBody                  Ingredient
+		expectedResponse             *Ingredient
+		expectedStatus               int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodIngredient,
+			&goodIngredient,
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			badIngredient,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, i store.Ingredient) (*store.Ingredient, error) {
+				return nil, errors.New("internalservererror")
+			},
+			goodIngredient,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/ingredients", bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{CreateIngredientOverride: testcase.createIngredientOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			var resBody Ingredient
+
+			if testcase.expectedResponse != nil {
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
+				assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
+				assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestUpdateIngredient(t *testing.T) {
+	goodIngredient := Ingredient{
+		IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		IngredientName: "onion",
+		Category:       "vegetables",
+		DaysUntilExp:   7,
+	}
+
+	badIngrRequest := Ingredient{
+		IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		IngredientName: "",
+		Category:       "",
+		DaysUntilExp:   7,
+	}
+
+	testcases := []struct {
+		name                         string
+		updateIngredientOverrideFunc func(ctx context.Context, i store.Ingredient) (*store.Ingredient, error)
+		requestBody                  Ingredient
+		expectedResponse             *Ingredient
+		expectedStatus               int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodIngredient,
+			&goodIngredient,
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			//it's misleading to have database override here, because it's not gonna hit the database anyway. To more clearly see it's a bad request, just leave it nil.
+			nil,
+			badIngrRequest,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, i store.Ingredient) (*store.Ingredient, error) {
+				return nil, errors.New("internalservererror")
+			},
+			goodIngredient,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/ingredients/"+testcase.requestBody.IngredientUUID.String(), bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{UpdateIngredientOverride: testcase.updateIngredientOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			var resBody Ingredient
+
+			if testcase.expectedResponse != nil {
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
+				assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
+				assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
+				assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
+			} else {
+				assert.Equal(t, 0, w.Body.Len()) //이거 w.Body.Len이 아니라 끝에 꼭 () 붙여줘 ㅎㅎ;;
+			}
+		})
+	}
+}
+
+func TestDeleteIngredient(t *testing.T) {
+	testcases := []struct {
+		name                         string
+		deleteIngredientOverrideFunc func(ctx context.Context, id uuid.UUID) error
+		requestBody                  string
+		expectedStatus               int
+	}{
+		{
+			"happyPath",
+			nil,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			"maerongmaerong",
+			http.StatusBadRequest,
+		},
+		{
+			"happyPath",
+			func(ctx context.Context, id uuid.UUID) error {
+				return errors.New("internalservererror")
+			},
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodDelete, "/ingredients/"+testcase.requestBody, nil)
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{DeleteIngredientOverride: testcase.deleteIngredientOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestSearchIngredients(t *testing.T) {
+	testcases := []struct {
+		name                          string
+		searchIngredientsOverrideFunc func(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error)
+		requestBody                   Ingredient
+		expectedResponse              []Ingredient
+		expectedStatus                int
+	}{
+		{
+			"happyPath",
+			nil,
+			Ingredient{IngredientName: "tuna"},
+			[]Ingredient{
+				{
+					IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					IngredientName: "tuna",
+					Category:       "tuna kimbap",
+					DaysUntilExp:   3,
+				},
+				{
+					IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					IngredientName: "tuna",
+					Category:       "tuna sushi",
+					DaysUntilExp:   3,
+				},
+			},
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			Ingredient{},
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error) {
+				return []store.Ingredient{}, errors.New("internalservererror")
+			},
+			Ingredient{IngredientName: "tuna"},
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/ingredients/search", bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{SearchIngredientsOverride: testcase.searchIngredientsOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			var resBody []Ingredient
+
+			if testcase.expectedResponse != nil {
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshaling the response body")
+
+				assert.Equal(t, len(testcase.expectedResponse), len(resBody))
+
+				for i := range testcase.expectedResponse {
+					assert.Equal(t, testcase.expectedResponse[i].IngredientUUID, resBody[i].IngredientUUID)
+					assert.Equal(t, testcase.expectedResponse[i].IngredientName, resBody[i].IngredientName)
+					assert.Equal(t, testcase.expectedResponse[i].Category, resBody[i].Category)
+					assert.Equal(t, testcase.expectedResponse[i].DaysUntilExp, resBody[i].DaysUntilExp)
+				}
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}

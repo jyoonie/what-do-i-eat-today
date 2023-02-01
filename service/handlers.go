@@ -41,11 +41,12 @@ func (s *Service) GetUser(c *gin.Context) {
 
 	user, err := s.db.GetUser(context.Background(), uid)
 	if err != nil {
-		l.Error("could not get user", zap.Error(err))
 		if errors.Is(err, store.ErrNotFound) {
+			l.Info("could not get user", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
+		l.Error("could not get user", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -67,7 +68,7 @@ func (s *Service) CreateUser(c *gin.Context) {
 		return
 	}
 
-	if !IsValidCreateUserRequest(createUserRequest.User, createUserRequest.Password) {
+	if !isValidCreateUserRequest(createUserRequest.User, createUserRequest.Password) {
 		l.Info("error creating user")
 		c.Status(http.StatusBadRequest)
 		return
@@ -100,7 +101,7 @@ func (s *Service) UpdateUser(c *gin.Context) {
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("could not get user", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
+		l.Info("could not update user", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -113,20 +114,179 @@ func (s *Service) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	if !IsValidUpdateUserRequest(updateUserRequest, uid) {
+	if !isValidUpdateUserRequest(updateUserRequest, uid) {
 		l.Info("error updating user")
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	u := apiUser2DBUser(updateUserRequest)
-
-	user, err := s.db.UpdateUser(context.Background(), u) //if I have two variables, I can still do combined if statement, like if user, err ... ; err != nil {}, but then user can only survive within the next 3 lines of if statement. So I can't return user variable at the bottom in c.JSON().
+	user, err := s.db.UpdateUser(context.Background(), apiUser2DBUser(updateUserRequest)) //if I have two variables, I can still do combined if statement, like if user, err ... ; err != nil {}, but then user can only survive within the next 3 lines of if statement. So I can't return user variable at the bottom in c.JSON().
 	if err != nil {
-		l.Error("error creating user", zap.Error(err))
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("could not update user", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("could not update user", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
 	c.JSON(http.StatusOK, dbUser2ApiUser(user))
+}
+
+func (s *Service) GetIngredient(c *gin.Context) {
+	l := s.l.Named("GetIngredient")
+
+	id := c.Param("id")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("could not get ingredient", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	ingredient, err := s.db.GetIngredient(context.Background(), uid)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("could not get ingredient", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("could not get ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbIngr2ApiIngr(ingredient))
+}
+
+func (s *Service) CreateIngredient(c *gin.Context) {
+	l := s.l.Named("CreateIngredient")
+
+	var createIngrRequest Ingredient
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&createIngrRequest); err != nil {
+		l.Info("could not create ingredient", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidCreateIngrRequest(createIngrRequest) {
+		l.Info("error creating ingredient")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	ingredient, err := s.db.CreateIngredient(context.Background(), apiIngr2DBIngr(createIngrRequest))
+	if err != nil {
+		l.Error("error creating ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbIngr2ApiIngr(ingredient))
+}
+
+func (s *Service) UpdateIngredient(c *gin.Context) {
+	l := s.l.Named("UpdateIngredient")
+
+	id := c.Param("id")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("could not update ingredient", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	var updateIngrRequest Ingredient
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&updateIngrRequest); err != nil {
+		l.Info("could not update ingredient", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidUpdateIngrRequest(updateIngrRequest, uid) {
+		l.Info("error updating ingredient")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	ingredient, err := s.db.UpdateIngredient(context.Background(), apiIngr2DBIngr(updateIngrRequest)) //if I have two variables, I can still do combined if statement, like if user, err ... ; err != nil {}, but then user can only survive within the next 3 lines of if statement. So I can't return user variable at the bottom in c.JSON().
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("could not update ingredient", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("could not update ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbIngr2ApiIngr(ingredient))
+}
+
+func (s *Service) DeleteIngredient(c *gin.Context) {
+	l := s.l.Named("DeleteIngredient")
+
+	id := c.Param("id")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("could not delete ingredient", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	err = s.db.DeleteIngredient(context.Background(), uid)
+	if err != nil {
+		l.Error("error deleting ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func (s *Service) SearchIngredients(c *gin.Context) {
+	l := s.l.Named("SearchIngredients")
+
+	var searchIngrRequest Ingredient
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&searchIngrRequest); err != nil {
+		l.Info("could not search ingredients", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidSearchIngrRequest(searchIngrRequest) {
+		l.Info("error searching ingredients")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	ingredients, err := s.db.SearchIngredients(context.Background(), apiIngr2DBIngr(searchIngrRequest))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("could not search ingredients", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("could not search ingredients", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	var searchIngrResponse []Ingredient
+
+	for _, ingredient := range ingredients {
+		i := dbIngr2ApiIngr(&ingredient)
+		searchIngrResponse = append(searchIngrResponse, i)
+	}
+
+	c.JSON(http.StatusOK, searchIngrResponse)
 }

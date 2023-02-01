@@ -2,7 +2,7 @@ package service
 
 import "github.com/google/uuid"
 
-func IsValidCreateUserRequest(u User, pwd string) bool {
+func isValidCreateUserRequest(u User, pwd string) bool {
 	switch {
 	case u.FirstName == "":
 		return false
@@ -17,7 +17,7 @@ func IsValidCreateUserRequest(u User, pwd string) bool {
 	return true
 }
 
-func IsValidUpdateUserRequest(u User, uidFromPath uuid.UUID) bool {
+func isValidUpdateUserRequest(u User, uidFromPath uuid.UUID) bool {
 	switch {
 	case uidFromPath != u.UserUUID:
 		return false
@@ -28,6 +28,44 @@ func IsValidUpdateUserRequest(u User, uidFromPath uuid.UUID) bool {
 	case u.LastName == "":
 		return false
 	case u.EmailAddress == "":
+		return false
+	}
+
+	return true
+}
+
+func isValidCreateIngrRequest(i Ingredient) bool {
+	switch {
+	case i.IngredientName == "":
+		return false
+	case i.Category == "":
+		return false
+	case i.DaysUntilExp == 0 || i.DaysUntilExp < 0:
+		return false
+	}
+
+	return true
+}
+
+func isValidUpdateIngrRequest(i Ingredient, uidFromPath uuid.UUID) bool {
+	switch {
+	case uidFromPath != i.IngredientUUID:
+		return false
+	case i.IngredientUUID == uuid.Nil:
+		return false
+	case i.IngredientName == "":
+		return false
+	case i.Category == "":
+		return false
+	case i.DaysUntilExp == 0 || i.DaysUntilExp < 0:
+		return false
+	}
+
+	return true
+}
+
+func isValidSearchIngrRequest(i Ingredient) bool {
+	if i.IngredientName == "" && i.Category == "" && (i.DaysUntilExp == 0 || i.DaysUntilExp < 0) {
 		return false
 	}
 
