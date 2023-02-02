@@ -33,6 +33,7 @@ require (
 require go.uber.org/zap v1.24.0
 
 require (
+	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/google/uuid v1.3.0
 	github.com/lib/pq v1.10.7
 	github.com/stretchr/testify v1.8.1

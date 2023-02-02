@@ -57,3 +57,31 @@ DROP TABLE IF EXISTS wdiet.ingredients;
 -- +goose StatementBegin
 DROP SCHEMA IF EXISTS wdiet;
 -- +goose StatementEnd
+
+-- +goose Up
+-- +goose StatementBegin
+CREATE SCHEMA IF NOT EXISTS wdiet;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS wdiet.fridges; --change the way the data looks.
+(
+    fridge_uuid uuid not null default gen_random_uuid()
+        constraint fridges_primary_key
+            primary key,
+    user_uuid        uuid            not null UNIQUE,
+    fridge_name      varchar(64)     not null UNIQUE,
+    created_at       timestamp       not null default now(),
+    updated_at       timestamp       not null default now()
+);
+-- +goose StatementEnd
+
+-- +goose Down
+
+-- +goose StatementBegin
+DROP TABLE IF EXISTS wdiet.fridges;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+DROP SCHEMA IF EXISTS wdiet;
+-- +goose StatementEnd

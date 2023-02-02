@@ -2,16 +2,19 @@ package mockstore
 
 import (
 	"context"
+	"fmt"
 	"time"
 	"wdiet/store"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var _ store.Store = (*Mockstore)(nil)
 
 type Mockstore struct {
 	PingOverride              func() error
+	GetUserByEmailOverride    func(ctx context.Context, email string) (*store.User, error)
 	GetUserOverride           func(ctx context.Context, id uuid.UUID) (*store.User, error)
 	CreateUserOverride        func(ctx context.Context, u store.User) (*store.User, error)
 	UpdateUserOverride        func(ctx context.Context, u store.User) (*store.User, error)
@@ -29,6 +32,28 @@ func (m *Mockstore) Ping() error {
 	return nil
 }
 
+func (m *Mockstore) GetUserByEmail(ctx context.Context, email string) (*store.User, error) {
+	if m.GetUserByEmailOverride != nil {
+		return m.GetUserByEmailOverride(ctx, email)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("hello"), bcrypt.MinCost)
+	if err != nil {
+		return nil, fmt.Errorf("error hashing mockstore default password: %w", err)
+	}
+
+	return &store.User{
+		UserUUID:       uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		HashedPassword: string(hashedPassword),
+		Active:         false,
+		FirstName:      "jy",
+		LastName:       "woo",
+		EmailAddress:   "jywoo92324@gmail.com",
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}, nil
+}
+
 func (m *Mockstore) GetUser(ctx context.Context, id uuid.UUID) (*store.User, error) {
 	if m.GetUserOverride != nil {
 		return m.GetUserOverride(ctx, id)
@@ -39,7 +64,10 @@ func (m *Mockstore) GetUser(ctx context.Context, id uuid.UUID) (*store.User, err
 		Active:         true,
 		FirstName:      "jy",
 		LastName:       "woo",
-		EmailAddress:   "jywoo92324@gmail.com"}, nil
+		EmailAddress:   "jywoo92324@gmail.com",
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}, nil
 }
 
 func (m *Mockstore) CreateUser(ctx context.Context, u store.User) (*store.User, error) {
@@ -78,6 +106,8 @@ func (m *Mockstore) GetIngredient(ctx context.Context, id uuid.UUID) (*store.Ing
 		IngredientName: "onion",
 		Category:       "vegetables",
 		DaysUntilExp:   7,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}, nil
 }
 
@@ -125,12 +155,16 @@ func (m *Mockstore) SearchIngredients(ctx context.Context, i store.Ingredient) (
 			IngredientName: "tuna",
 			Category:       "tuna kimbap",
 			DaysUntilExp:   3,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
 		},
 		{
 			IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
 			IngredientName: "tuna",
 			Category:       "tuna sushi",
 			DaysUntilExp:   3,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
 		},
 	}, nil
 }

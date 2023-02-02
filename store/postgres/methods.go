@@ -18,6 +18,34 @@ func (pg *PG) Ping() error { //implementing the Store interface, nice to separat
 
 const defaultTimeout = 5 * time.Second
 
+func (pg *PG) GetUserByEmail(ctx context.Context, email string) (*store.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var u store.User
+
+	row := pg.db.QueryRowContext(ctx, sqlGetUserByEmail, email)
+	if err := row.Scan(
+		&u.UserUUID,       //don't half fill a struct, if you're returning a *store.User, return every field. Make every field valid, instead of just filling two fields of it.
+		&u.HashedPassword, //don't mess up the order on a Scan, cause it's gonna follow the order from sql.go
+		&u.UserUUID,
+		&u.HashedPassword,
+		&u.Active,
+		&u.FirstName,
+		&u.LastName,
+		&u.EmailAddress,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, fmt.Errorf("error getting user: %w", err)
+	}
+
+	return &u, nil
+}
+
 func (pg *PG) GetUser(ctx context.Context, id uuid.UUID) (*store.User, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()

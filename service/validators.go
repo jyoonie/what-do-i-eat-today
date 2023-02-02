@@ -71,3 +71,11 @@ func isValidSearchIngrRequest(i Ingredient) bool {
 
 	return true
 }
+
+func isValidLoginRequest(l Login) bool {
+	if l.EmailAddress == "" || l.Password == "" {
+		return false
+	}
+
+	return true
+}

@@ -17,11 +17,6 @@ type User struct {
 	UpdatedAt      time.Time
 }
 
-type Login struct {
-	EmailAddress string
-	Password     string
-}
-
 type Ingredient struct {
 	IngredientUUID uuid.UUID
 	IngredientName string

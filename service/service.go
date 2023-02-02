@@ -4,17 +4,22 @@ import (
 	"wdiet/store"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"go.uber.org/zap"
 )
 
 type Service struct {
-	r  *gin.Engine
-	db store.Store
-	l  *zap.Logger
+	r               *gin.Engine
+	db              store.Store
+	l               *zap.Logger
+	mySigningKey    []byte
+	mySigningMethod jwt.SigningMethod
 }
 
 func New(s store.Store, l *zap.Logger) *Service {
 	newService := &Service{r: gin.Default(), db: s, l: l}
+	newService.mySigningKey = []byte("jyoonieisthebestandsheisprettyandsheissmart") //signing key는 HS512의 경우 80자 권장..ㄷㄷ 길수록 좋음
+	newService.mySigningMethod = jwt.SigningMethodHS512
 
 	newService.registerRoutes()
 

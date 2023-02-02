@@ -1,5 +1,23 @@
 package postgres
 
+const sqlGetUserByEmail = `
+	SELECT 	user_uuid,
+			hashed_password,
+			active,
+			first_name,
+			last_name,
+			email_address,
+			created_at,
+			updated_at
+	
+	FROM 	wdiet.users
+	
+	WHERE	email_address = $1
+
+	LIMIT 1
+	;
+`
+
 const sqlGetUser = `
 	SELECT 	user_uuid,
 			hashed_password,

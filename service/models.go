@@ -23,6 +23,10 @@ type Login struct {
 	Password     string `json:"password,omitempty"`
 }
 
+type Token struct {
+	Token string `json:"token,omitempty"`
+}
+
 type Ingredient struct {
 	IngredientUUID uuid.UUID `json:"ingredient_uuid,omitempty"`
 	IngredientName string    `json:"ingredient_name,omitempty"`
