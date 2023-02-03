@@ -136,3 +136,50 @@ const sqlsearchIngredients = `
 	WHERE ingredient_name LIKE '%$1%' OR category = $2 OR days_until_exp = $3
 	;
 `
+
+const sqlGetFridge = `
+	SELECT 	user_uuid,
+			fridge_name,
+			created_at,
+			updated_at
+	
+	FROM 	wdiet.fridges
+	
+	WHERE	user_uuid = $1
+
+	LIMIT 1
+	;
+`
+
+const sqlCreateFridge = `
+	INSERT INTO wdiet.fridges(
+		user_uuid,
+		fridge_name,
+	)
+	VALUES(
+		$1,
+		$2,
+	)
+	RETURNING user_uuid, fridge_name, created_at, updated_at
+	;
+`
+
+const sqlUpdateFridge = `
+	UPDATE wdiet.ingredients
+		SET 
+			fridge_name = $1,
+			updated_at = now()
+	WHERE user_uuid = $2
+	RETURNING user_uuid, fridge_name, created_at, updated_at
+	;
+`
+
+const sqlDeleteFridge = `
+	DELETE 
+		FROM wdiet.fridges
+
+	WHERE user_uuid = $1
+
+	LIMIT 1
+	;
+`

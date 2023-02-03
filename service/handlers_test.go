@@ -228,11 +228,12 @@ func TestGetUser(t *testing.T) {
 				err := json.Unmarshal(w.Body.Bytes(), &resBody)
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
-				assert.Equal(t, testcase.expectedResponse.UserUUID, resBody.UserUUID)
-				assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
-				assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
-				assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
-				assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+				// assert.Equal(t, testcase.expectedResponse.UserUUID, resBody.UserUUID)
+				// assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
+				// assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
+				// assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
+				// assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
@@ -254,7 +255,7 @@ func TestCreateUser(t *testing.T) {
 			EmailAddress: "jywoo92324@gmail.com"},
 		Password: "abcdefgh"}
 
-	badUserRequest := createUserRequest{
+	badUser := createUserRequest{
 		User: User{
 			Active:       true,
 			FirstName:    "",
@@ -279,7 +280,7 @@ func TestCreateUser(t *testing.T) {
 		{
 			"badRequest",
 			nil,
-			badUserRequest,
+			badUser,
 			nil,
 			http.StatusBadRequest,
 		},
@@ -314,10 +315,11 @@ func TestCreateUser(t *testing.T) {
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
 				assert.NotEqual(t, resBody.UserUUID, uuid.Nil) //uuid가 랜덤으로 generate 됐기 때문에, 그냥 response uuid가 uuid Nil이 아닌지만 검사.
-				assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
-				assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
-				assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
-				assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+				// assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
+				// assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
+				// assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
+				// assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
@@ -334,7 +336,7 @@ func TestUpdateUser(t *testing.T) {
 		EmailAddress: "jywoo92324@gmail.com",
 	}
 
-	badUserRequest := User{
+	badUser := User{
 		UserUUID:     uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
 		Active:       true,
 		FirstName:    "",
@@ -359,7 +361,7 @@ func TestUpdateUser(t *testing.T) {
 		{
 			"badRequest",
 			nil,
-			badUserRequest,
+			badUser,
 			nil,
 			http.StatusBadRequest,
 		},
@@ -393,11 +395,12 @@ func TestUpdateUser(t *testing.T) {
 				err = json.Unmarshal(w.Body.Bytes(), &resBody)
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
-				assert.Equal(t, testcase.expectedResponse.UserUUID, resBody.UserUUID)
-				assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
-				assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
-				assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
-				assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+				// assert.Equal(t, testcase.expectedResponse.UserUUID, resBody.UserUUID)
+				// assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
+				// assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
+				// assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
+				// assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
@@ -458,10 +461,11 @@ func TestGetIngredient(t *testing.T) {
 				err := json.Unmarshal(w.Body.Bytes(), &resBody)
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
-				assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
-				assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
-				assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
-				assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+				// assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
+				// assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
+				// assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
+				// assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
@@ -531,9 +535,10 @@ func TestCreateIngredient(t *testing.T) {
 				err := json.Unmarshal(w.Body.Bytes(), &resBody)
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
-				assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
-				assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
-				assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+				// assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
+				// assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
+				// assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
@@ -549,7 +554,7 @@ func TestUpdateIngredient(t *testing.T) {
 		DaysUntilExp:   7,
 	}
 
-	badIngrRequest := Ingredient{
+	badIngredient := Ingredient{
 		IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
 		IngredientName: "",
 		Category:       "",
@@ -574,7 +579,7 @@ func TestUpdateIngredient(t *testing.T) {
 			"badRequest",
 			//it's misleading to have database override here, because it's not gonna hit the database anyway. To more clearly see it's a bad request, just leave it nil.
 			nil,
-			badIngrRequest,
+			badIngredient,
 			nil,
 			http.StatusBadRequest,
 		},
@@ -608,10 +613,11 @@ func TestUpdateIngredient(t *testing.T) {
 				err := json.Unmarshal(w.Body.Bytes(), &resBody)
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
-				assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
-				assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
-				assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
-				assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+				// assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
+				// assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
+				// assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
+				// assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
 			} else {
 				assert.Equal(t, 0, w.Body.Len()) //이거 w.Body.Len이 아니라 끝에 꼭 () 붙여줘 ㅎㅎ;;
 			}
@@ -729,14 +735,253 @@ func TestSearchIngredients(t *testing.T) {
 				assert.Equal(t, len(testcase.expectedResponse), len(resBody))
 
 				for i := range testcase.expectedResponse {
-					assert.Equal(t, testcase.expectedResponse[i].IngredientUUID, resBody[i].IngredientUUID)
-					assert.Equal(t, testcase.expectedResponse[i].IngredientName, resBody[i].IngredientName)
-					assert.Equal(t, testcase.expectedResponse[i].Category, resBody[i].Category)
-					assert.Equal(t, testcase.expectedResponse[i].DaysUntilExp, resBody[i].DaysUntilExp)
+					assert.Equal(t, testcase.expectedResponse[i], resBody[i])
+					// assert.Equal(t, testcase.expectedResponse[i].IngredientUUID, resBody[i].IngredientUUID)
+					// assert.Equal(t, testcase.expectedResponse[i].IngredientName, resBody[i].IngredientName)
+					// assert.Equal(t, testcase.expectedResponse[i].Category, resBody[i].Category)
+					// assert.Equal(t, testcase.expectedResponse[i].DaysUntilExp, resBody[i].DaysUntilExp)
 				}
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
 		})
+	}
+}
+
+func TestGetFridge(t *testing.T) {
+	testcases := []struct {
+		name                  string
+		getFridgeOverrideFunc func(ctx context.Context, id uuid.UUID) (*store.Fridge, error)
+		requestBody           string
+		expectedResponse      *Fridge
+		expectedStatus        int
+	}{
+		{
+			"happyPath",
+			nil,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			&Fridge{
+				UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+				FridgeName: "jy fridge",
+			},
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			"stupidshit",
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, id uuid.UUID) (*store.Fridge, error) {
+				return nil, errors.New("internalServerError")
+			},
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/fridges/"+testcase.requestBody, nil)
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{GetFridgeOverride: testcase.getFridgeOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedResponse != nil {
+				var resBody Fridge
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error marshalling the response body")
+
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestCreateFridge(t *testing.T) {
+	goodFridge := Fridge{
+		UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		FridgeName: "jy fridge",
+	}
+
+	badFridge := Fridge{
+		UserUUID:   uuid.Nil,
+		FridgeName: "",
+	}
+
+	testcases := []struct {
+		name                     string
+		createFridgeOverrideFunc func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
+		requestBody              Fridge
+		expectedResponse         *Fridge
+		expectedStatus           int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodFridge,
+			&goodFridge,
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			badFridge,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
+				return nil, errors.New("internalServerError")
+			},
+			goodFridge,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/fridges", bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{CreateFridgeOverride: testcase.createFridgeOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedResponse != nil {
+				var resBody Fridge
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error marshalling the response body")
+
+				assert.Equal(t, *testcase.expectedResponse, resBody)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestUpdateFridge(t *testing.T) {
+	goodFridge := Fridge{
+		UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		FridgeName: "jy fridge",
+	}
+
+	badFridge := Fridge{
+		UserUUID:   uuid.Nil,
+		FridgeName: "",
+	}
+
+	testcases := []struct {
+		name                     string
+		updateFridgeOverrideFunc func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
+		requestBody              Fridge
+		expectedResponse         *Fridge
+		expectedStatus           int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodFridge,
+			&goodFridge,
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			badFridge,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
+				return nil, errors.New("internalServerError")
+			},
+			goodFridge,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		reqBody, err := json.Marshal(testcase.requestBody)
+		assert.NoError(t, err, "unexpected error marshalling the request body")
+
+		req := httptest.NewRequest(http.MethodPost, "/fridges/"+testcase.requestBody.UserUUID.String(), bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
+
+		testServer.db = &mockstore.Mockstore{UpdateFridgeOverride: testcase.updateFridgeOverrideFunc}
+		testServer.r.ServeHTTP(w, req)
+
+		assert.Equal(t, testcase.expectedStatus, w.Code)
+
+		if testcase.expectedResponse != nil {
+			var resBody Fridge
+
+			err := json.Unmarshal(w.Body.Bytes(), &resBody)
+			assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+			assert.Equal(t, *testcase.expectedResponse, resBody)
+		} else {
+			assert.Equal(t, 0, w.Body.Len())
+		}
+	}
+}
+
+func TestDeleteFridge(t *testing.T) {
+	testcases := []struct {
+		name                     string
+		deleteFridgeOverrideFunc func(ctx context.Context, id uuid.UUID) error
+		reqBody                  string
+		expectedStatus           int
+	}{
+		{
+			"happyPath",
+			nil,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			"baboya",
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, id uuid.UUID) error {
+				return errors.New("internalServerError")
+			},
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		req := httptest.NewRequest(http.MethodDelete, "/fridges/"+testcase.reqBody, nil)
+		w := httptest.NewRecorder()
+
+		testServer.db = &mockstore.Mockstore{DeleteFridgeOverride: testcase.deleteFridgeOverrideFunc}
+		testServer.r.ServeHTTP(w, req)
+
+		assert.Equal(t, testcase.expectedStatus, w.Code)
 	}
 }

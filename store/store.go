@@ -26,4 +26,9 @@ type Store interface { //keeping a strict separation between the layers of your 
 	UpdateIngredient(ctx context.Context, i Ingredient) (*Ingredient, error)
 	SearchIngredients(ctx context.Context, i Ingredient) ([]Ingredient, error)
 	DeleteIngredient(ctx context.Context, id uuid.UUID) error
+
+	GetFridge(ctx context.Context, id uuid.UUID) (*Fridge, error)
+	CreateFridge(ctx context.Context, f Fridge) (*Fridge, error)
+	UpdateFridge(ctx context.Context, f Fridge) (*Fridge, error)
+	DeleteFridge(ctx context.Context, id uuid.UUID) error
 }

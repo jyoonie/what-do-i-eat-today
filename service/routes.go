@@ -19,5 +19,10 @@ func (s *Service) registerRoutes() {
 		s.r.POST("/ingredients", s.CreateIngredient)
 		s.r.POST("/ingredients/:id", s.UpdateIngredient)
 		s.r.DELETE("/ingredients/:id", s.DeleteIngredient)
+
+		s.r.GET("/fridges/:id", s.GetFridge)
+		s.r.POST("/fridges", s.CreateFridge)
+		s.r.POST("/fridges/:id", s.UpdateFridge)
+		s.r.DELETE("/fridges/:id", s.DeleteFridge)
 	}
 }

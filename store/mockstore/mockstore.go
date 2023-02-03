@@ -23,6 +23,10 @@ type Mockstore struct {
 	UpdateIngredientOverride  func(ctx context.Context, i store.Ingredient) (*store.Ingredient, error)
 	DeleteIngredientOverride  func(ctx context.Context, id uuid.UUID) error
 	SearchIngredientsOverride func(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error)
+	GetFridgeOverride         func(ctx context.Context, id uuid.UUID) (*store.Fridge, error)
+	CreateFridgeOverride      func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
+	UpdateFridgeOverride      func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
+	DeleteFridgeOverride      func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *Mockstore) Ping() error {
@@ -167,4 +171,48 @@ func (m *Mockstore) SearchIngredients(ctx context.Context, i store.Ingredient) (
 			UpdatedAt:      time.Now(),
 		},
 	}, nil
+}
+
+func (m *Mockstore) GetFridge(ctx context.Context, id uuid.UUID) (*store.Fridge, error) {
+	if m.GetFridgeOverride != nil {
+		return m.GetFridgeOverride(ctx, id)
+	}
+
+	return &store.Fridge{
+		UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		FridgeName: "jy fridge",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}, nil
+}
+
+func (m *Mockstore) CreateFridge(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
+	if m.CreateFridgeOverride != nil {
+		return m.CreateFridgeOverride(ctx, f)
+	}
+
+	return &store.Fridge{
+		UserUUID:   f.UserUUID,
+		FridgeName: f.FridgeName,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}, nil
+}
+
+func (m *Mockstore) UpdateFridge(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
+	if m.UpdateFridgeOverride != nil {
+		return m.UpdateFridgeOverride(ctx, f)
+	}
+
+	f.UpdatedAt = time.Now()
+
+	return &f, nil
+}
+
+func (m *Mockstore) DeleteFridge(ctx context.Context, id uuid.UUID) error {
+	if m.DeleteFridgeOverride != nil {
+		return m.DeleteFridgeOverride(ctx, id)
+	}
+
+	return nil
 }

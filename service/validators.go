@@ -79,3 +79,27 @@ func isValidLoginRequest(l Login) bool {
 
 	return true
 }
+
+func isValidCreateFridgeRequest(f Fridge) bool {
+	switch {
+	case f.UserUUID == uuid.Nil:
+		return false
+	case f.FridgeName == "":
+		return false
+	}
+
+	return true
+}
+
+func isValidUpdateFridgeRequest(f Fridge, uidFromPath uuid.UUID) bool {
+	switch {
+	case uidFromPath != f.UserUUID:
+		return false
+	case f.UserUUID == uuid.Nil:
+		return false
+	case f.FridgeName == "":
+		return false
+	}
+
+	return true
+}

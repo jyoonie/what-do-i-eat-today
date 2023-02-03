@@ -262,35 +262,6 @@ func (pg *PG) UpdateIngredient(ctx context.Context, i store.Ingredient) (*store.
 	return &ingredient, nil
 }
 
-func (pg *PG) DeleteIngredient(ctx context.Context, id uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
-	defer cancel() //it defers cancel until it returns from an error(actually, until it returns from current function, even john doesn't know what will happen after you return without an error. Does cancel() execute?) So what does it do? It cancels the context everywhere, so you don't do extra work when you know it's gonna fail. Context is per request.
-
-	//writing to or deleting from db, you should be in a transaction
-	tx, err := pg.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("error deleting ingredient: %w", err)
-	}
-
-	res, err := tx.ExecContext(ctx, sqlDeleteIngredient, id)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("error deleting ingredient: %w", err)
-	}
-
-	if affected, _ := res.RowsAffected(); affected != 1 {
-		tx.Rollback()
-		return fmt.Errorf("error deleting ingredient, rows affected is %d instead of 1", affected)
-	}
-
-	if err = tx.Commit(); err != nil {
-		tx.Rollback()
-		return fmt.Errorf("error deleting ingredient: %w", err)
-	}
-
-	return nil
-}
-
 func (pg *PG) SearchIngredients(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error) {
 	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
@@ -325,4 +296,160 @@ func (pg *PG) SearchIngredients(ctx context.Context, i store.Ingredient) ([]stor
 	// 	return nil, err
 	// }
 	return ingredients, nil
+}
+
+func (pg *PG) DeleteIngredient(ctx context.Context, id uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel() //it defers cancel until it returns from an error(actually, until it returns from current function, even john doesn't know what will happen after you return without an error. Does cancel() execute?) So what does it do? It cancels the context everywhere, so you don't do extra work when you know it's gonna fail. Context is per request.
+
+	//writing to or deleting from db, you should be in a transaction
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting ingredient: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, sqlDeleteIngredient, id)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting ingredient: %w", err)
+	}
+
+	if affected, _ := res.RowsAffected(); affected != 1 { //you do this to prevent update when without WHERE clause, or if there's two rows that have the same WHERE condition I don't need to do it when it's queryRowContext. Only works with multiple rows.
+		tx.Rollback()
+		return fmt.Errorf("error deleting ingredient, rows affected is %d instead of 1", affected)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting ingredient: %w", err)
+	}
+
+	return nil
+}
+
+func (pg *PG) GetFridge(ctx context.Context, id uuid.UUID) (*store.Fridge, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	var fridge store.Fridge
+
+	row := pg.db.QueryRowContext(ctx, sqlGetFridge, id)
+	if err := row.Scan(
+		&fridge.UserUUID,
+		&fridge.FridgeName,
+		&fridge.CreatedAt,
+		&fridge.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, store.ErrNotFound
+		}
+		return nil, fmt.Errorf("error getting fridge: %w", err)
+	}
+
+	return &fridge, nil
+}
+
+func (pg *PG) CreateFridge(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating fridge: %w", err)
+	}
+
+	var fridge store.Fridge
+
+	row := pg.db.QueryRowContext(ctx, sqlCreateFridge,
+		&f.UserUUID,
+		&f.FridgeName,
+	)
+
+	err = row.Scan(
+		&fridge.UserUUID,
+		&fridge.FridgeName,
+		&fridge.CreatedAt,
+		&fridge.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			tx.Rollback()
+			return nil, store.ErrNotFound
+		}
+		tx.Rollback()
+		return nil, fmt.Errorf("error creating fridge: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error creating fridge: %w", err)
+	}
+
+	return &fridge, nil
+}
+
+func (pg *PG) UpdateFridge(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error updating fridge: %w", err)
+	}
+
+	var fridge store.Fridge
+
+	row := pg.db.QueryRowContext(ctx, sqlUpdateFridge, //여기에 나온 순서는 sql.go에서 $로 순서매겨놓은 순서.
+		&f.FridgeName,
+		&f.UserUUID,
+	)
+
+	if err = row.Scan( //여기에 나온 순서는 sql.go에서 RETURNING 뒤의 필드 순서.
+		&fridge.UserUUID,
+		&fridge.FridgeName,
+		&fridge.CreatedAt,
+		&fridge.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			tx.Rollback()
+			return nil, store.ErrNotFound
+		}
+		tx.Rollback()
+		return nil, fmt.Errorf("error updating fridge: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("error updating fridge: %w", err)
+	}
+
+	return &fridge, nil
+}
+
+func (pg *PG) DeleteFridge(ctx context.Context, id uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel() //to make sure that the cancel function runs, otherwise I have to say it before every return cause by error
+
+	tx, err := pg.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting fridge: %w", err)
+	}
+
+	res, err := pg.db.ExecContext(ctx, sqlDeleteFridge, id)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting fridge: %w", err)
+	}
+
+	if affected, _ := res.RowsAffected(); affected != 1 {
+		tx.Rollback()
+		return fmt.Errorf("error deleting fridge, rows affected %d instead of 1", affected)
+	}
+
+	if err = tx.Commit(); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("error deleting fridge: %w", err)
+	}
+
+	return nil
 }

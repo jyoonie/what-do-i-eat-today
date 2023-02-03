@@ -37,7 +37,7 @@ func (s *Service) Login(c *gin.Context) {
 	var loginRequest Login
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&loginRequest); err != nil { //decode 한다음에 그 내용이 valid한지 비교해야지 바보야.. 저 위에 var loginRequest create 한거는 새로 생긴거자나.. 으이구
-		l.Info("could not login", zap.Error(err))
+		l.Info("error logging in", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -51,17 +51,17 @@ func (s *Service) Login(c *gin.Context) {
 	user, err := s.db.GetUserByEmail(context.Background(), loginRequest.EmailAddress)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			l.Info("could not log in", zap.Error(err))
+			l.Info("error logging in", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
-		l.Error("could not log in", zap.Error(err))
+		l.Error("error logging in", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(loginRequest.Password)); err != nil {
-		l.Info("could not login", zap.Error(err))
+		l.Info("error logging in", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -80,7 +80,7 @@ func (s *Service) Login(c *gin.Context) {
 	token := jwt.NewWithClaims(s.mySigningMethod, claims)
 	signedToken, err := token.SignedString(s.mySigningKey)
 	if err != nil {
-		l.Error("unexpected error signing the token")
+		l.Error("error signing the token")
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -125,7 +125,7 @@ func (s *Service) GetUser(c *gin.Context) {
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("could not get user", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
+		l.Info("error getting user", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -133,11 +133,11 @@ func (s *Service) GetUser(c *gin.Context) {
 	user, err := s.db.GetUser(context.Background(), uid)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			l.Info("could not get user", zap.Error(err))
+			l.Info("error getting user", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
-		l.Error("could not get user", zap.Error(err))
+		l.Error("error getting user", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -154,7 +154,7 @@ func (s *Service) CreateUser(c *gin.Context) {
 	}
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&createUserRequest); err != nil {
-		l.Info("could not create user", zap.Error(err))
+		l.Info("error creating user", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -192,7 +192,7 @@ func (s *Service) UpdateUser(c *gin.Context) {
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("could not update user", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
+		l.Info("error updating user", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -200,7 +200,7 @@ func (s *Service) UpdateUser(c *gin.Context) {
 	var updateUserRequest User
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&updateUserRequest); err != nil {
-		l.Info("could not update user", zap.Error(err))
+		l.Info("error updating user", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -214,11 +214,11 @@ func (s *Service) UpdateUser(c *gin.Context) {
 	user, err := s.db.UpdateUser(context.Background(), apiUser2DBUser(updateUserRequest)) //if I have two variables, I can still do combined if statement, like if user, err ... ; err != nil {}, but then user can only survive within the next 3 lines of if statement. So I can't return user variable at the bottom in c.JSON().
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			l.Info("could not update user", zap.Error(err))
+			l.Info("error updating user", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
-		l.Error("could not update user", zap.Error(err))
+		l.Error("error updating user", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -233,7 +233,7 @@ func (s *Service) GetIngredient(c *gin.Context) {
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("could not get ingredient", zap.Error(err))
+		l.Info("error getting ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -241,11 +241,11 @@ func (s *Service) GetIngredient(c *gin.Context) {
 	ingredient, err := s.db.GetIngredient(context.Background(), uid)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			l.Info("could not get ingredient", zap.Error(err))
+			l.Info("error getting ingredient", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
-		l.Error("could not get ingredient", zap.Error(err))
+		l.Error("error getting ingredient", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -259,7 +259,7 @@ func (s *Service) CreateIngredient(c *gin.Context) {
 	var createIngrRequest Ingredient
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&createIngrRequest); err != nil {
-		l.Info("could not create ingredient", zap.Error(err))
+		l.Info("error creating ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -287,7 +287,7 @@ func (s *Service) UpdateIngredient(c *gin.Context) {
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("could not update ingredient", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
+		l.Info("error updating ingredient", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -295,7 +295,7 @@ func (s *Service) UpdateIngredient(c *gin.Context) {
 	var updateIngrRequest Ingredient
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&updateIngrRequest); err != nil {
-		l.Info("could not update ingredient", zap.Error(err))
+		l.Info("error updating ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -309,38 +309,16 @@ func (s *Service) UpdateIngredient(c *gin.Context) {
 	ingredient, err := s.db.UpdateIngredient(context.Background(), apiIngr2DBIngr(updateIngrRequest)) //if I have two variables, I can still do combined if statement, like if user, err ... ; err != nil {}, but then user can only survive within the next 3 lines of if statement. So I can't return user variable at the bottom in c.JSON().
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			l.Info("could not update ingredient", zap.Error(err))
+			l.Info("error updating ingredient", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
-		l.Error("could not update ingredient", zap.Error(err))
+		l.Error("error updating ingredient", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
 	c.JSON(http.StatusOK, dbIngr2ApiIngr(ingredient))
-}
-
-func (s *Service) DeleteIngredient(c *gin.Context) {
-	l := s.l.Named("DeleteIngredient")
-
-	id := c.Param("id")
-
-	uid, err := uuid.Parse(id)
-	if err != nil {
-		l.Info("could not delete ingredient", zap.Error(err))
-		c.Status(http.StatusBadRequest)
-		return
-	}
-
-	err = s.db.DeleteIngredient(context.Background(), uid)
-	if err != nil {
-		l.Error("error deleting ingredient", zap.Error(err))
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	c.Status(http.StatusOK)
 }
 
 func (s *Service) SearchIngredients(c *gin.Context) {
@@ -349,7 +327,7 @@ func (s *Service) SearchIngredients(c *gin.Context) {
 	var searchIngrRequest Ingredient
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&searchIngrRequest); err != nil {
-		l.Info("could not search ingredients", zap.Error(err))
+		l.Info("error searching ingredients", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -363,11 +341,11 @@ func (s *Service) SearchIngredients(c *gin.Context) {
 	ingredients, err := s.db.SearchIngredients(context.Background(), apiIngr2DBIngr(searchIngrRequest))
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			l.Info("could not search ingredients", zap.Error(err))
+			l.Info("error searching ingredients", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
-		l.Error("could not search ingredients", zap.Error(err))
+		l.Error("error searching ingredients", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -380,4 +358,141 @@ func (s *Service) SearchIngredients(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, searchIngrResponse)
+}
+
+func (s *Service) DeleteIngredient(c *gin.Context) {
+	l := s.l.Named("DeleteIngredient")
+
+	id := c.Param("id")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error deleting ingredient", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if err = s.db.DeleteIngredient(context.Background(), uid); err != nil {
+		l.Error("error deleting ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func (s *Service) GetFridge(c *gin.Context) {
+	l := s.l.Named("GetFridge")
+
+	id := c.Param("id")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error getting fridge", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	fridge, err := s.db.GetFridge(context.Background(), uid)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("error getting fridge", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("error getting fridge", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbFridge2ApiFridge(fridge))
+}
+
+func (s *Service) CreateFridge(c *gin.Context) {
+	l := s.l.Named("CreateFridge")
+
+	var createFridgeRequest Fridge
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&createFridgeRequest); err != nil {
+		l.Info("error creating fridge", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidCreateFridgeRequest(createFridgeRequest) {
+		l.Info("error creating fridge")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	fridge, err := s.db.CreateFridge(context.Background(), apiFridge2DBFridge(createFridgeRequest))
+	if err != nil {
+		l.Error("error creating fridge", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbFridge2ApiFridge(fridge))
+}
+
+func (s *Service) UpdateFridge(c *gin.Context) {
+	l := s.l.Named("UpdateFridge")
+
+	id := c.Param("id")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error updating fridge", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	var updateFridgeRequest Fridge
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&updateFridgeRequest); err != nil {
+		l.Info("error updating fridge", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidUpdateFridgeRequest(updateFridgeRequest, uid) {
+		l.Info("error updating fridge", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	fridge, err := s.db.UpdateFridge(context.Background(), apiFridge2DBFridge(updateFridgeRequest))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("error updating fridge", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("error updating fridge", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbFridge2ApiFridge(fridge))
+}
+
+func (s *Service) DeleteFridge(c *gin.Context) {
+	l := s.l.Named("DeleteFridge")
+
+	id := c.Param("id")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error deleting fridge", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if err = s.db.DeleteFridge(context.Background(), uid); err != nil {
+		l.Error("error deleting fridge", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }

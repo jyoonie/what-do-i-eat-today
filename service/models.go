@@ -35,3 +35,10 @@ type Ingredient struct {
 	//created_at           time.Time
 	//updated_at           time.Time
 }
+
+type Fridge struct {
+	UserUUID   uuid.UUID `json:"user_uuid,omitempty"`
+	FridgeName string    `json:"fridge_name,omitempty"`
+	// created_at       time.Time
+	// updated_at       time.Time
+}

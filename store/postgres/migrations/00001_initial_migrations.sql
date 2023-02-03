@@ -66,14 +66,14 @@ CREATE SCHEMA IF NOT EXISTS wdiet;
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS wdiet.fridges; --change the way the data looks.
 (
-    fridge_uuid uuid not null default gen_random_uuid()
-        constraint fridges_primary_key
-            primary key,
     user_uuid        uuid            not null UNIQUE,
     fridge_name      varchar(64)     not null UNIQUE,
     created_at       timestamp       not null default now(),
     updated_at       timestamp       not null default now()
 );
+
+CREATE INDEX ON wdiets.fridges (user_uuid);
+ALTER TABLE wdiet.fridges ADD FOREIGN KEY user_uuid REFERENCES wdiet.users (user_uuid);
 -- +goose StatementEnd
 
 -- +goose Down

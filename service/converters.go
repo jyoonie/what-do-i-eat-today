@@ -1,6 +1,8 @@
 package service
 
-import "wdiet/store"
+import (
+	"wdiet/store"
+)
 
 func apiUser2DBUser(u User) store.User { //your user always submits a value, that's why you take the value. 이 모델은 핸들러에서 요청 받은거 db model로 변환할 때 쓴다.
 	return store.User{
@@ -37,5 +39,19 @@ func dbIngr2ApiIngr(i *store.Ingredient) Ingredient {
 		IngredientName: i.IngredientName,
 		Category:       i.Category,
 		DaysUntilExp:   i.DaysUntilExp,
+	}
+}
+
+func apiFridge2DBFridge(f Fridge) store.Fridge {
+	return store.Fridge{
+		UserUUID:   f.UserUUID,
+		FridgeName: f.FridgeName,
+	}
+}
+
+func dbFridge2ApiFridge(f *store.Fridge) Fridge {
+	return Fridge{
+		UserUUID:   f.UserUUID,
+		FridgeName: f.FridgeName,
 	}
 }

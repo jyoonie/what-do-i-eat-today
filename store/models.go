@@ -31,3 +31,10 @@ type Ingredient struct {
 // 	Category       *string
 // 	DaysUntilExp   *int
 // }
+
+type Fridge struct {
+	UserUUID   uuid.UUID
+	FridgeName string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
