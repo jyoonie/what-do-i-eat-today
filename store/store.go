@@ -15,20 +15,26 @@ type Store interface { //keeping a strict separation between the layers of your 
 	//The other benefit of having store interface is certainly that you can switch between databases that fulfill your store interface.
 	Ping() error
 
-	GetUserByEmail(ctx context.Context, email string) (*User, error)
-
 	GetUser(ctx context.Context, id uuid.UUID) (*User, error)
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	CreateUser(ctx context.Context, u User) (*User, error)
 	UpdateUser(ctx context.Context, u User) (*User, error)
 
 	GetIngredient(ctx context.Context, id uuid.UUID) (*Ingredient, error)
+	SearchIngredients(ctx context.Context, i SearchIngredient) ([]Ingredient, error)
 	CreateIngredient(ctx context.Context, i Ingredient) (*Ingredient, error)
 	UpdateIngredient(ctx context.Context, i Ingredient) (*Ingredient, error)
-	SearchIngredients(ctx context.Context, i Ingredient) ([]Ingredient, error)
 	DeleteIngredient(ctx context.Context, id uuid.UUID) error
 
-	GetFridge(ctx context.Context, id uuid.UUID) (*Fridge, error)
-	CreateFridge(ctx context.Context, f Fridge) (*Fridge, error)
-	UpdateFridge(ctx context.Context, f Fridge) (*Fridge, error)
-	DeleteFridge(ctx context.Context, id uuid.UUID) error
+	ListFridgeIngredients(ctx context.Context, i uuid.UUID) ([]FridgeIngredient, error)
+	CreateFridgeIngredient(ctx context.Context, f FridgeIngredient) (*FridgeIngredient, error)
+	UpdateFridgeIngredient(ctx context.Context, f FridgeIngredient) (*FridgeIngredient, error)
+	DeleteFridgeIngredient(ctx context.Context, uid uuid.UUID, fid uuid.UUID) error
+
+	GetRecipe(ctx context.Context, id uuid.UUID) (*Recipe, error)
+	ListRecipes(ctx context.Context, id uuid.UUID) ([]Recipe, error)
+	SearchRecipes(ctx context.Context, r SearchRecipes) ([]Recipe, error)
+	CreateRecipe(ctx context.Context, r Recipe) (*Recipe, error)
+	UpdateRecipe(ctx context.Context, r Recipe) (*Recipe, error)
+	DeleteRecipe(ctx context.Context, id uuid.UUID) error
 }

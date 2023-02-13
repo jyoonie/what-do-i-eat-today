@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-
 	"wdiet/service"
 	"wdiet/store/postgres"
 
@@ -10,10 +9,14 @@ import (
 )
 
 func main() {
-	l, err := zap.NewProduction() //set up logger first
+	l, err := zap.NewProduction()
 	if err != nil {
 		log.Fatal(err)
 	}
+	// l, err := zap.NewProduction() //set up logger first
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	l = l.Named("wdietService")
 

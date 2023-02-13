@@ -95,10 +95,11 @@ func (s *Service) ValidateToken(c *gin.Context) {
 		return
 	}
 
-	if len(token) < 2 {
+	if len(strings.Split(token, " ")) < 2 {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
-	} //return 했으므로 else 할 필요없음. return 안하면 어차피 continue 되기 때문에.
+	} //return 했으므로 else 할 필요없음. return에 안걸리면 어차피 else에 해당하는 부분은 continue 되기 때문에.
+
 	realToken := strings.Split(token, " ")[1]
 
 	t, err := jwt.Parse(realToken, //getting rid of "bearer " from the original token
@@ -150,7 +151,7 @@ func (s *Service) CreateUser(c *gin.Context) {
 
 	var createUserRequest struct { //embedding User struct
 		User
-		Password string `json:"password,omitempty"` //you only need to use this field once in this one spot(CreateUser)
+		Password string `json:"password,omitempty"` //you only need to use this field once at this one spot(CreateUser)
 	}
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&createUserRequest); err != nil {
@@ -177,7 +178,7 @@ func (s *Service) CreateUser(c *gin.Context) {
 
 	user, err := s.db.CreateUser(context.Background(), u) //이렇게 에러 처리해놓으면 굳이 db에서 *store.User를 리턴할 필요는 없지만, 이 에러처리를 까먹는 개발자도 있음..
 	if err != nil {
-		l.Error("error creating user", zap.Error(err)) //error creating user, user.UUID 이렇게 zero value 필드에 접근하는 실수를 하는 개발자도 있다고..;; 그래서 위를 포함한 이러한 상황에 대비해 *store.User로 리턴하는 것임..
+		l.Error("error creating user", zap.Error(err)) //error creating user, user.UUID(create 실패한 user인데 이 user의 UUID를 에러 메시지로 반환하려고;;) 이렇게 zero value 필드에 접근하는 실수를 하는 개발자도 있다고..;; 그래서 위를 포함한 이러한 상황에 대비해 *store.User로 리턴하는 것임..
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -192,7 +193,7 @@ func (s *Service) UpdateUser(c *gin.Context) {
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("error updating user", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
+		l.Info("error updating user", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -231,14 +232,14 @@ func (s *Service) GetIngredient(c *gin.Context) {
 
 	id := c.Param("id")
 
-	uid, err := uuid.Parse(id)
+	iid, err := uuid.Parse(id)
 	if err != nil {
 		l.Info("error getting ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	ingredient, err := s.db.GetIngredient(context.Background(), uid)
+	ingredient, err := s.db.GetIngredient(context.Background(), iid)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			l.Info("error getting ingredient", zap.Error(err))
@@ -251,6 +252,50 @@ func (s *Service) GetIngredient(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dbIngr2ApiIngr(ingredient))
+}
+
+func (s *Service) SearchIngredients(c *gin.Context) {
+	l := s.l.Named("SearchIngredients")
+
+	var searchIngrRequest SearchIngredient
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&searchIngrRequest); err != nil {
+		l.Info("error searching ingredients", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidSearchIngrRequest(searchIngrRequest) {
+		l.Info("error searching ingredients")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	ingredients, err := s.db.SearchIngredients(context.Background(), apiSearchIngr2DBSearchIngr(searchIngrRequest))
+	if err != nil {
+		// if errors.Is(err, store.ErrNotFound) {
+		// 	l.Info("error searching ingredients", zap.Error(err))
+		// 	c.Status(http.StatusNotFound)
+		// 	return
+		// }
+		l.Error("error searching ingredients", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if len(ingredients) == 0 {
+		c.Status(http.StatusOK)
+		return
+	}
+
+	var searchIngrResponse []Ingredient
+
+	for _, ingredient := range ingredients {
+		i := dbIngr2ApiIngr(&ingredient)
+		searchIngrResponse = append(searchIngrResponse, i)
+	}
+
+	c.JSON(http.StatusOK, searchIngrResponse)
 }
 
 func (s *Service) CreateIngredient(c *gin.Context) {
@@ -285,7 +330,7 @@ func (s *Service) UpdateIngredient(c *gin.Context) {
 
 	id := c.Param("id")
 
-	uid, err := uuid.Parse(id)
+	iid, err := uuid.Parse(id)
 	if err != nil {
 		l.Info("error updating ingredient", zap.Error(err)) //error message shouldn't contain single quote(') cause it might break. Spacebar is okay.
 		c.Status(http.StatusBadRequest)
@@ -300,7 +345,7 @@ func (s *Service) UpdateIngredient(c *gin.Context) {
 		return
 	}
 
-	if !isValidUpdateIngrRequest(updateIngrRequest, uid) {
+	if !isValidUpdateIngrRequest(updateIngrRequest, iid) {
 		l.Info("error updating ingredient")
 		c.Status(http.StatusBadRequest)
 		return
@@ -321,58 +366,19 @@ func (s *Service) UpdateIngredient(c *gin.Context) {
 	c.JSON(http.StatusOK, dbIngr2ApiIngr(ingredient))
 }
 
-func (s *Service) SearchIngredients(c *gin.Context) {
-	l := s.l.Named("SearchIngredients")
-
-	var searchIngrRequest Ingredient
-
-	if err := json.NewDecoder(c.Request.Body).Decode(&searchIngrRequest); err != nil {
-		l.Info("error searching ingredients", zap.Error(err))
-		c.Status(http.StatusBadRequest)
-		return
-	}
-
-	if !isValidSearchIngrRequest(searchIngrRequest) {
-		l.Info("error searching ingredients")
-		c.Status(http.StatusBadRequest)
-		return
-	}
-
-	ingredients, err := s.db.SearchIngredients(context.Background(), apiIngr2DBIngr(searchIngrRequest))
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			l.Info("error searching ingredients", zap.Error(err))
-			c.Status(http.StatusNotFound)
-			return
-		}
-		l.Error("error searching ingredients", zap.Error(err))
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	var searchIngrResponse []Ingredient
-
-	for _, ingredient := range ingredients {
-		i := dbIngr2ApiIngr(&ingredient)
-		searchIngrResponse = append(searchIngrResponse, i)
-	}
-
-	c.JSON(http.StatusOK, searchIngrResponse)
-}
-
 func (s *Service) DeleteIngredient(c *gin.Context) {
 	l := s.l.Named("DeleteIngredient")
 
 	id := c.Param("id")
 
-	uid, err := uuid.Parse(id)
+	iid, err := uuid.Parse(id)
 	if err != nil {
 		l.Info("error deleting ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	if err = s.db.DeleteIngredient(context.Background(), uid); err != nil {
+	if err = s.db.DeleteIngredient(context.Background(), iid); err != nil {
 		l.Error("error deleting ingredient", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
@@ -381,115 +387,355 @@ func (s *Service) DeleteIngredient(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (s *Service) GetFridge(c *gin.Context) {
-	l := s.l.Named("GetFridge")
+func (s *Service) ListFridgeIngredients(c *gin.Context) {
+	l := s.l.Named("ListFridgeIngredients")
 
 	id := c.Param("id")
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("error getting fridge", zap.Error(err))
+		l.Info("error listing fridge ingredients", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	fridge, err := s.db.GetFridge(context.Background(), uid)
+	fridgeIngredients, err := s.db.ListFridgeIngredients(context.Background(), uid)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			l.Info("error getting fridge", zap.Error(err))
-			c.Status(http.StatusNotFound)
-			return
-		}
-		l.Error("error getting fridge", zap.Error(err))
+		// if errors.Is(err, store.ErrNotFound) {
+		// 	l.Info("error listing fridge ingredients", zap.Error(err))
+		// 	c.Status(http.StatusNotFound)
+		// 	return
+		// }
+		l.Error("error listing fridge ingredients", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
-	c.JSON(http.StatusOK, dbFridge2ApiFridge(fridge))
+	if len(fridgeIngredients) == 0 {
+		c.Status(http.StatusOK)
+		return
+	}
+
+	var listFIngrResponse []FridgeIngredient
+
+	for _, f := range fridgeIngredients {
+		fridgeIngredient := dbFIngr2ApiFIngr(&f)
+		listFIngrResponse = append(listFIngrResponse, fridgeIngredient)
+	}
+
+	c.JSON(http.StatusOK, listFIngrResponse)
 }
 
-func (s *Service) CreateFridge(c *gin.Context) {
+func (s *Service) CreateFridgeIngredient(c *gin.Context) {
 	l := s.l.Named("CreateFridge")
 
-	var createFridgeRequest Fridge
+	var createFIngrRequest FridgeIngredient
 
-	if err := json.NewDecoder(c.Request.Body).Decode(&createFridgeRequest); err != nil {
-		l.Info("error creating fridge", zap.Error(err))
+	if err := json.NewDecoder(c.Request.Body).Decode(&createFIngrRequest); err != nil {
+		l.Info("error creating fridge ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	if !isValidCreateFridgeRequest(createFridgeRequest) {
-		l.Info("error creating fridge")
+	if !isValidCreateFIngrRequest(createFIngrRequest) {
+		l.Info("error creating fridge ingredient")
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	fridge, err := s.db.CreateFridge(context.Background(), apiFridge2DBFridge(createFridgeRequest))
+	ingredient, err := s.db.GetIngredient(context.Background(), createFIngrRequest.IngredientUUID)
 	if err != nil {
-		l.Error("error creating fridge", zap.Error(err))
+		l.Error("error creating fridge ingredient", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
-	c.JSON(http.StatusOK, dbFridge2ApiFridge(fridge))
+	createFIngrRequest.ExpirationDate = createFIngrRequest.PurchasedDate.Add(24 * time.Hour * time.Duration(ingredient.DaysUntilExp))
+
+	fridgeIngredient, err := s.db.CreateFridgeIngredient(context.Background(), apiFIngr2DBFIngr(createFIngrRequest))
+	if err != nil {
+		l.Error("error creating fridge ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbFIngr2ApiFIngr(fridgeIngredient))
 }
 
-func (s *Service) UpdateFridge(c *gin.Context) {
-	l := s.l.Named("UpdateFridge")
+func (s *Service) UpdateFridgeIngredient(c *gin.Context) {
+	l := s.l.Named("UpdateFridgeIngredient")
 
 	id := c.Param("id")
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("error updating fridge", zap.Error(err))
+		l.Info("error updating ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	var updateFridgeRequest Fridge
+	var updateFIngrRequest FridgeIngredient
 
-	if err := json.NewDecoder(c.Request.Body).Decode(&updateFridgeRequest); err != nil {
-		l.Info("error updating fridge", zap.Error(err))
+	if err := json.NewDecoder(c.Request.Body).Decode(&updateFIngrRequest); err != nil {
+		l.Info("error updating fridge ingredient", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	if !isValidUpdateFridgeRequest(updateFridgeRequest, uid) {
-		l.Info("error updating fridge", zap.Error(err))
+	if !isValidUpdateFIngrRequest(updateFIngrRequest, uid) {
+		l.Info("error updating fridge ingredient")
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	fridge, err := s.db.UpdateFridge(context.Background(), apiFridge2DBFridge(updateFridgeRequest))
+	ingredient, err := s.db.GetIngredient(context.Background(), updateFIngrRequest.IngredientUUID)
+	if err != nil {
+		l.Error("error upating fridge ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	updateFIngrRequest.ExpirationDate = updateFIngrRequest.PurchasedDate.Add(24 * time.Hour * time.Duration(ingredient.DaysUntilExp))
+
+	fridgeIngredient, err := s.db.UpdateFridgeIngredient(context.Background(), apiFIngr2DBFIngr(updateFIngrRequest))
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			l.Info("error updating fridge", zap.Error(err))
+			l.Info("error updating fridge ingredient", zap.Error(err))
 			c.Status(http.StatusNotFound)
 			return
 		}
-		l.Error("error updating fridge", zap.Error(err))
+		l.Error("error updating fridge ingredient", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 
-	c.JSON(http.StatusOK, dbFridge2ApiFridge(fridge))
+	c.JSON(http.StatusOK, dbFIngr2ApiFIngr(fridgeIngredient))
 }
 
-func (s *Service) DeleteFridge(c *gin.Context) {
-	l := s.l.Named("DeleteFridge")
+func (s *Service) DeleteFridgeIngredient(c *gin.Context) {
+	l := s.l.Named("DeleteFridgeIngredient")
+
+	id := c.Param("uid")
+	id2 := c.Param("fid")
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error deleting fridge ingredient", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	fid, err := uuid.Parse(id2)
+	if err != nil {
+		l.Info("error deleting fridge ingredient", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	// var deleteFIngrRequest DeleteFIngr
+
+	// if err := json.NewDecoder(c.Request.Body).Decode(&deleteFIngrRequest); err != nil {
+	// 	l.Info("error deleting fridge ingredient", zap.Error(err))
+	// 	c.Status(http.StatusBadRequest)
+	// 	return
+	// }
+
+	// if !isValidDeleteFIngrRequest(deleteFIngrRequest, uid) {
+	// 	l.Info("error deleting fridge ingredient")
+	// 	c.Status(http.StatusBadRequest)
+	// 	return
+	// }
+
+	if err := s.db.DeleteFridgeIngredient(context.Background(), uid, fid); err != nil {
+		l.Error("error deleting fridge ingredient", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+func (s *Service) GetRecipe(c *gin.Context) {
+	l := s.l.Named("GetRecipe")
+
+	id := c.Param("id")
+
+	rid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error getting recipe", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	recipe, err := s.db.GetRecipe(context.Background(), rid)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("error getting recipe", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("error getting recipe", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbRecipe2ApiRecipe(recipe))
+}
+
+func (s *Service) ListRecipes(c *gin.Context) {
+	l := s.l.Named("ListRecipes")
 
 	id := c.Param("id")
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		l.Info("error deleting fridge", zap.Error(err))
+		l.Info("error listing recipes", zap.Error(err))
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
-	if err = s.db.DeleteFridge(context.Background(), uid); err != nil {
-		l.Error("error deleting fridge", zap.Error(err))
+	recipes, err := s.db.ListRecipes(context.Background(), uid)
+	if err != nil {
+		l.Error("error listing recipes", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if len(recipes) == 0 {
+		c.Status(http.StatusOK)
+		return
+	}
+
+	var listRecipesResponse []Recipe
+
+	for _, recipe := range recipes {
+		r := dbRecipe2ApiRecipe(&recipe)
+		listRecipesResponse = append(listRecipesResponse, r)
+	}
+
+	c.JSON(http.StatusOK, listRecipesResponse)
+}
+
+func (s *Service) SearchRecipes(c *gin.Context) {
+	l := s.l.Named("SearchRecipes")
+
+	var searchRecipesRequest SearchRecipes
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&searchRecipesRequest); err != nil {
+		l.Info("error searching recipes", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidSearchRecipesRequest(searchRecipesRequest) {
+		l.Info("error searching recipes")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	recipes, err := s.db.SearchRecipes(context.Background(), apiSearchR2DBSearchR(searchRecipesRequest))
+	if err != nil {
+		l.Error("error searching recipes", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	if len(recipes) == 0 {
+		c.Status(http.StatusOK)
+		return
+	}
+
+	var searchRecipesResponse []Recipe
+
+	for _, recipe := range recipes {
+		r := dbRecipe2ApiRecipe(&recipe)
+		searchRecipesResponse = append(searchRecipesResponse, r)
+	}
+
+	c.JSON(http.StatusOK, searchRecipesResponse)
+}
+
+func (s *Service) CreateRecipe(c *gin.Context) {
+	l := s.l.Named("CreateRecipe")
+
+	var createRecipeRequest Recipe
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&createRecipeRequest); err != nil {
+		l.Info("error creating recipe", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidCreateRecipeRequest(createRecipeRequest) {
+		l.Info("error creating recipe")
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	recipe, err := s.db.CreateRecipe(context.Background(), apiRecipe2DBRecipe(createRecipeRequest))
+	if err != nil {
+		l.Error("error creating recipe", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbRecipe2ApiRecipe(recipe))
+}
+
+func (s *Service) UpdateRecipe(c *gin.Context) {
+	l := s.l.Named("UpdateRecipe")
+
+	id := c.Param("id")
+
+	rid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error updating recipe", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	var updateRecipeRequest Recipe
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&updateRecipeRequest); err != nil {
+		l.Info("error updating recipe", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if !isValidUpdateRecipeRequest(updateRecipeRequest, rid) {
+		l.Info("error updating recipe", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	recipe, err := s.db.UpdateRecipe(context.Background(), apiRecipe2DBRecipe(updateRecipeRequest))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			l.Info("error updating recipe", zap.Error(err))
+			c.Status(http.StatusNotFound)
+			return
+		}
+		l.Error("error updating recipe", zap.Error(err))
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, dbRecipe2ApiRecipe(recipe))
+}
+
+func (s *Service) DeleteRecipe(c *gin.Context) {
+	l := s.l.Named("DeleteRecipe")
+
+	id := c.Param("id")
+
+	rid, err := uuid.Parse(id)
+	if err != nil {
+		l.Info("error deleting recipe", zap.Error(err))
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if err = s.db.DeleteRecipe(context.Background(), rid); err != nil {
+		l.Error("error deleting recipe", zap.Error(err))
 		c.Status(http.StatusInternalServerError)
 		return
 	}

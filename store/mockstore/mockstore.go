@@ -13,20 +13,30 @@ import (
 var _ store.Store = (*Mockstore)(nil)
 
 type Mockstore struct {
-	PingOverride              func() error
-	GetUserByEmailOverride    func(ctx context.Context, email string) (*store.User, error)
-	GetUserOverride           func(ctx context.Context, id uuid.UUID) (*store.User, error)
-	CreateUserOverride        func(ctx context.Context, u store.User) (*store.User, error)
-	UpdateUserOverride        func(ctx context.Context, u store.User) (*store.User, error)
+	PingOverride func() error
+
+	GetUserOverride        func(ctx context.Context, id uuid.UUID) (*store.User, error)
+	GetUserByEmailOverride func(ctx context.Context, email string) (*store.User, error)
+	CreateUserOverride     func(ctx context.Context, u store.User) (*store.User, error)
+	UpdateUserOverride     func(ctx context.Context, u store.User) (*store.User, error)
+
 	GetIngredientOverride     func(ctx context.Context, id uuid.UUID) (*store.Ingredient, error)
+	SearchIngredientsOverride func(ctx context.Context, i store.SearchIngredient) ([]store.Ingredient, error)
 	CreateIngredientOverride  func(ctx context.Context, i store.Ingredient) (*store.Ingredient, error)
 	UpdateIngredientOverride  func(ctx context.Context, i store.Ingredient) (*store.Ingredient, error)
 	DeleteIngredientOverride  func(ctx context.Context, id uuid.UUID) error
-	SearchIngredientsOverride func(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error)
-	GetFridgeOverride         func(ctx context.Context, id uuid.UUID) (*store.Fridge, error)
-	CreateFridgeOverride      func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
-	UpdateFridgeOverride      func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
-	DeleteFridgeOverride      func(ctx context.Context, id uuid.UUID) error
+
+	ListFridgeIngredientsOverride  func(ctx context.Context, id uuid.UUID) ([]store.FridgeIngredient, error)
+	CreateFridgeIngredientOverride func(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error)
+	UpdateFridgeIngredientOverride func(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error)
+	DeleteFridgeIngredientOverride func(ctx context.Context, uid uuid.UUID, fid uuid.UUID) error
+
+	GetRecipeOverride     func(ctx context.Context, id uuid.UUID) (*store.Recipe, error)
+	ListRecipesOverride   func(ctx context.Context, id uuid.UUID) ([]store.Recipe, error)
+	SearchRecipesOverride func(ctx context.Context, r store.SearchRecipes) ([]store.Recipe, error)
+	CreateRecipeOverride  func(ctx context.Context, r store.Recipe) (*store.Recipe, error)
+	UpdateRecipeOverride  func(ctx context.Context, r store.Recipe) (*store.Recipe, error)
+	DeleteRecipeOverride  func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *Mockstore) Ping() error {
@@ -34,6 +44,23 @@ func (m *Mockstore) Ping() error {
 		return m.PingOverride()
 	}
 	return nil
+}
+
+func (m *Mockstore) GetUser(ctx context.Context, id uuid.UUID) (*store.User, error) {
+	if m.GetUserOverride != nil {
+		return m.GetUserOverride(ctx, id)
+	}
+
+	return &store.User{
+		UserUUID:       id,
+		HashedPassword: "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
+		Active:         true,
+		FirstName:      "jy",
+		LastName:       "woo",
+		EmailAddress:   "jywoo92324@gmail.com",
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}, nil
 }
 
 func (m *Mockstore) GetUserByEmail(ctx context.Context, email string) (*store.User, error) {
@@ -52,23 +79,7 @@ func (m *Mockstore) GetUserByEmail(ctx context.Context, email string) (*store.Us
 		Active:         false,
 		FirstName:      "jy",
 		LastName:       "woo",
-		EmailAddress:   "jywoo92324@gmail.com",
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-	}, nil
-}
-
-func (m *Mockstore) GetUser(ctx context.Context, id uuid.UUID) (*store.User, error) {
-	if m.GetUserOverride != nil {
-		return m.GetUserOverride(ctx, id)
-	}
-	return &store.User{
-		UserUUID:       uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-		HashedPassword: "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
-		Active:         true,
-		FirstName:      "jy",
-		LastName:       "woo",
-		EmailAddress:   "jywoo92324@gmail.com",
+		EmailAddress:   email, //"jywoo92324@gmail.com"
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
 	}, nil
@@ -106,12 +117,37 @@ func (m *Mockstore) GetIngredient(ctx context.Context, id uuid.UUID) (*store.Ing
 		return m.GetIngredientOverride(ctx, id)
 	}
 	return &store.Ingredient{
-		IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		IngredientUUID: id,
 		IngredientName: "onion",
 		Category:       "vegetables",
 		DaysUntilExp:   7,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
+	}, nil
+}
+
+func (m *Mockstore) SearchIngredients(ctx context.Context, i store.SearchIngredient) ([]store.Ingredient, error) {
+	if m.SearchIngredientsOverride != nil {
+		return m.SearchIngredientsOverride(ctx, i)
+	}
+
+	return []store.Ingredient{
+		{
+			IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+			IngredientName: "tuna",
+			Category:       "tuna kimbap",
+			DaysUntilExp:   3,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		},
+		{
+			IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+			IngredientName: "tuna",
+			Category:       "tuna sushi",
+			DaysUntilExp:   3,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		},
 	}, nil
 }
 
@@ -148,60 +184,55 @@ func (m *Mockstore) DeleteIngredient(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (m *Mockstore) SearchIngredients(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error) {
-	if m.SearchIngredientsOverride != nil {
-		return m.SearchIngredientsOverride(ctx, i)
+func (m *Mockstore) ListFridgeIngredients(ctx context.Context, id uuid.UUID) ([]store.FridgeIngredient, error) {
+	if m.ListFridgeIngredientsOverride != nil {
+		return m.ListFridgeIngredientsOverride(ctx, id)
 	}
 
-	return []store.Ingredient{
+	return []store.FridgeIngredient{
 		{
-			IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-			IngredientName: "tuna",
-			Category:       "tuna kimbap",
-			DaysUntilExp:   3,
+			UserUUID:       id,
+			IngredientUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+			Amount:         3,
+			Unit:           "kg",
+			PurchasedDate:  time.Date(2023, time.March, 24, 15, 0, 0, 0, time.Now().Location()),
+			ExpirationDate: time.Date(2023, time.March, 24, 15, 0, 0, 0, time.Now().Location()),
 			CreatedAt:      time.Now(),
 			UpdatedAt:      time.Now(),
 		},
 		{
-			IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-			IngredientName: "tuna",
-			Category:       "tuna sushi",
-			DaysUntilExp:   3,
+			UserUUID:       id,
+			IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+			Amount:         2,
+			Unit:           "L",
+			PurchasedDate:  time.Date(2023, time.March, 24, 15, 0, 0, 0, time.Now().Location()),
+			ExpirationDate: time.Date(2023, time.March, 31, 15, 0, 0, 0, time.Now().Location()),
 			CreatedAt:      time.Now(),
 			UpdatedAt:      time.Now(),
 		},
 	}, nil
 }
 
-func (m *Mockstore) GetFridge(ctx context.Context, id uuid.UUID) (*store.Fridge, error) {
-	if m.GetFridgeOverride != nil {
-		return m.GetFridgeOverride(ctx, id)
+func (m *Mockstore) CreateFridgeIngredient(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error) {
+	if m.CreateFridgeIngredientOverride != nil {
+		return m.CreateFridgeIngredientOverride(ctx, f)
 	}
 
-	return &store.Fridge{
-		UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-		FridgeName: "jy fridge",
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+	return &store.FridgeIngredient{
+		UserUUID:       f.UserUUID,
+		IngredientUUID: f.IngredientUUID,
+		Amount:         f.Amount,
+		Unit:           f.Unit,
+		PurchasedDate:  f.PurchasedDate,
+		ExpirationDate: f.ExpirationDate,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}, nil
 }
 
-func (m *Mockstore) CreateFridge(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
-	if m.CreateFridgeOverride != nil {
-		return m.CreateFridgeOverride(ctx, f)
-	}
-
-	return &store.Fridge{
-		UserUUID:   f.UserUUID,
-		FridgeName: f.FridgeName,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
-	}, nil
-}
-
-func (m *Mockstore) UpdateFridge(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
-	if m.UpdateFridgeOverride != nil {
-		return m.UpdateFridgeOverride(ctx, f)
+func (m *Mockstore) UpdateFridgeIngredient(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error) {
+	if m.UpdateFridgeIngredientOverride != nil {
+		return m.UpdateFridgeIngredientOverride(ctx, f)
 	}
 
 	f.UpdatedAt = time.Now()
@@ -209,9 +240,135 @@ func (m *Mockstore) UpdateFridge(ctx context.Context, f store.Fridge) (*store.Fr
 	return &f, nil
 }
 
-func (m *Mockstore) DeleteFridge(ctx context.Context, id uuid.UUID) error {
-	if m.DeleteFridgeOverride != nil {
-		return m.DeleteFridgeOverride(ctx, id)
+func (m *Mockstore) DeleteFridgeIngredient(ctx context.Context, uid uuid.UUID, fid uuid.UUID) error {
+	if m.DeleteFridgeIngredientOverride != nil {
+		return m.DeleteFridgeIngredientOverride(ctx, uid, fid)
+	}
+
+	return nil
+}
+
+func (m *Mockstore) GetRecipe(ctx context.Context, id uuid.UUID) (*store.Recipe, error) {
+	if m.GetRecipeOverride != nil {
+		return m.GetRecipeOverride(ctx, id)
+	}
+
+	return &store.Recipe{
+		RecipeUUID: id,
+		UserUUID:   uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		RecipeName: "kimchi fried rice",
+		Category:   "Korean",
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}, nil
+}
+
+func (m *Mockstore) ListRecipes(ctx context.Context, id uuid.UUID) ([]store.Recipe, error) {
+	if m.ListRecipesOverride != nil {
+		return m.ListRecipesOverride(ctx, id)
+	}
+
+	return []store.Recipe{
+		{
+			RecipeUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+			UserUUID:   id,
+			RecipeName: "kimchi jeon",
+			Category:   "Korean",
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		},
+		{
+			RecipeUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+			UserUUID:   id,
+			RecipeName: "kimchi mandu",
+			Category:   "Korean",
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		},
+	}, nil
+}
+
+func (m *Mockstore) SearchRecipes(ctx context.Context, r store.SearchRecipes) ([]store.Recipe, error) {
+	if m.SearchRecipesOverride != nil {
+		return m.SearchRecipesOverride(ctx, r)
+	}
+
+	return []store.Recipe{
+		{
+			RecipeUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+			UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+			RecipeName: "salmon nigiri",
+			Category:   "Japanese",
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		},
+		{
+			RecipeUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+			UserUUID:   uuid.MustParse("ebe96725-44ef-47ee-979f-8baf823d7283"),
+			RecipeName: "salmon nigiri",
+			Category:   "Japanese",
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		},
+	}, nil
+}
+
+func (m *Mockstore) CreateRecipe(ctx context.Context, r store.Recipe) (*store.Recipe, error) {
+	if m.CreateRecipeOverride != nil {
+		return m.CreateRecipeOverride(ctx, r)
+	}
+
+	recipeID := uuid.New()
+
+	return &store.Recipe{
+		RecipeUUID: recipeID,
+		UserUUID:   uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		RecipeName: "kimchi fried rice",
+		Category:   "Korean",
+		Ingredients: []store.RecipeIngredient{
+			{
+				RecipeUUID:     recipeID,                                               //이바부야.. methods.go에서 이미 recipe.RecipeUUID로 채워놨자나..
+				IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99b"), //니 맘대로 uuid 바꿔도 상관없어~ 숫자, 소문자, 대문자 다 상관없어, as long as they're 0~9,a~f
+				Amount:         1,
+				Unit:           "kg",
+			},
+			{
+				RecipeUUID:     recipeID,
+				IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99b"),
+				Amount:         1,
+				Unit:           "unit",
+			},
+		},
+		Instructions: []store.RecipeInstruction{
+			{
+				RecipeUUID:  recipeID,
+				StepNum:     1,
+				Instruction: "Chop kimchi, onion and pork belly",
+			},
+			{
+				RecipeUUID:  recipeID,
+				StepNum:     2,
+				Instruction: "grill the pan and put some oil on it",
+			},
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}, nil
+}
+
+func (m *Mockstore) UpdateRecipe(ctx context.Context, r store.Recipe) (*store.Recipe, error) {
+	if m.UpdateRecipeOverride != nil {
+		return m.UpdateRecipeOverride(ctx, r)
+	}
+
+	r.UpdatedAt = time.Now()
+
+	return &r, nil
+}
+
+func (m *Mockstore) DeleteRecipe(ctx context.Context, id uuid.UUID) error {
+	if m.DeleteRecipeOverride != nil {
+		return m.DeleteRecipeOverride(ctx, id)
 	}
 
 	return nil

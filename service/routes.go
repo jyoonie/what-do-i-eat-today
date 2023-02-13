@@ -12,17 +12,24 @@ func (s *Service) registerRoutes() {
 	authorized := s.r.Group("/")
 	authorized.Use(s.ValidateToken)
 	{
-		s.r.GET("/users/:id", s.GetUser)
-		s.r.POST("/users/:id", s.UpdateUser)
+		authorized.GET("/users/:id", s.GetUser)
+		authorized.POST("/users/:id", s.UpdateUser)
 
-		s.r.GET("/ingredients/:id", s.GetIngredient)
-		s.r.POST("/ingredients", s.CreateIngredient)
-		s.r.POST("/ingredients/:id", s.UpdateIngredient)
-		s.r.DELETE("/ingredients/:id", s.DeleteIngredient)
+		authorized.GET("/ingredients/:id", s.GetIngredient)
+		authorized.POST("/ingredients", s.CreateIngredient)
+		authorized.POST("/ingredients/:id", s.UpdateIngredient)
+		authorized.DELETE("/ingredients/:id", s.DeleteIngredient)
 
-		s.r.GET("/fridges/:id", s.GetFridge)
-		s.r.POST("/fridges", s.CreateFridge)
-		s.r.POST("/fridges/:id", s.UpdateFridge)
-		s.r.DELETE("/fridges/:id", s.DeleteFridge)
+		authorized.GET("/users/:id/fridge_ingredients", s.ListFridgeIngredients)
+		authorized.POST("/fridge_ingredients", s.CreateFridgeIngredient)
+		authorized.POST("/fridge_ingredients/:id", s.UpdateFridgeIngredient)
+		authorized.DELETE("/users/:uid/fridge_ingredients/:fid", s.DeleteFridgeIngredient)
+
+		authorized.GET("/recipes/:id", s.GetRecipe)
+		authorized.GET("/users/:id/recipes", s.ListRecipes)
+		authorized.POST("/recipes/search", s.SearchRecipes)
+		authorized.POST("/recipes", s.CreateRecipe)
+		authorized.POST("/recipes/:id", s.UpdateRecipe)
+		authorized.DELETE("/recipes/:id", s.DeleteRecipe)
 	}
 }

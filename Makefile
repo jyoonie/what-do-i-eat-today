@@ -1,5 +1,5 @@
 # by putting PHONY list on top, you're telling makefile that you're not asking it to make a file, you're asking it to do something
-.PHONY: dbuild dclean drun database
+.PHONY: dbuild dclean drun database migrateup migratedown
 
 dbuild:
 	docker build -t wdiet:latest .

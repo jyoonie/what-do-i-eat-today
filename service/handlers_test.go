@@ -20,7 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var l, _ = zap.NewProduction()
+var l = zap.NewNop()
 
 var testServer = New(&mockstore.Mockstore{}, l)
 
@@ -315,11 +315,11 @@ func TestCreateUser(t *testing.T) {
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
 				assert.NotEqual(t, resBody.UserUUID, uuid.Nil) //uuid가 랜덤으로 generate 됐기 때문에, 그냥 response uuid가 uuid Nil이 아닌지만 검사.
-				assert.Equal(t, *testcase.expectedResponse, resBody)
-				// assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
-				// assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
-				// assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
-				// assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
+				//assert.Equal(t, *testcase.expectedResponse, resBody)
+				assert.Equal(t, testcase.expectedResponse.Active, resBody.Active)
+				assert.Equal(t, testcase.expectedResponse.FirstName, resBody.FirstName)
+				assert.Equal(t, testcase.expectedResponse.LastName, resBody.LastName)
+				assert.Equal(t, testcase.expectedResponse.EmailAddress, resBody.EmailAddress)
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
@@ -473,6 +473,87 @@ func TestGetIngredient(t *testing.T) {
 	}
 }
 
+func TestSearchIngredients(t *testing.T) {
+	testcases := []struct {
+		name                          string
+		searchIngredientsOverrideFunc func(ctx context.Context, i store.SearchIngredient) ([]store.Ingredient, error)
+		requestBody                   Ingredient
+		expectedResponse              []Ingredient
+		expectedStatus                int
+	}{
+		{
+			"happyPath",
+			nil,
+			Ingredient{IngredientName: "tuna"},
+			[]Ingredient{
+				{
+					IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					IngredientName: "tuna",
+					Category:       "tuna kimbap",
+					DaysUntilExp:   3,
+				},
+				{
+					IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					IngredientName: "tuna",
+					Category:       "tuna sushi",
+					DaysUntilExp:   3,
+				},
+			},
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			Ingredient{},
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, i store.SearchIngredient) ([]store.Ingredient, error) {
+				return []store.Ingredient{}, errors.New("internalServerError")
+			},
+			Ingredient{IngredientName: "tuna"},
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/ingredients/search", bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{SearchIngredientsOverride: testcase.searchIngredientsOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedResponse != nil {
+				var resBody []Ingredient
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshaling the response body")
+
+				assert.Equal(t, len(testcase.expectedResponse), len(resBody))
+
+				for i := range testcase.expectedResponse {
+					assert.Equal(t, testcase.expectedResponse[i], resBody[i])
+					// assert.Equal(t, testcase.expectedResponse[i].IngredientUUID, resBody[i].IngredientUUID)
+					// assert.Equal(t, testcase.expectedResponse[i].IngredientName, resBody[i].IngredientName)
+					// assert.Equal(t, testcase.expectedResponse[i].Category, resBody[i].Category)
+					// assert.Equal(t, testcase.expectedResponse[i].DaysUntilExp, resBody[i].DaysUntilExp)
+				}
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
 func TestCreateIngredient(t *testing.T) {
 	goodIngredient := Ingredient{
 		IngredientName: "onion",
@@ -535,10 +616,11 @@ func TestCreateIngredient(t *testing.T) {
 				err := json.Unmarshal(w.Body.Bytes(), &resBody)
 				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
-				assert.Equal(t, *testcase.expectedResponse, resBody)
-				// assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
-				// assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
-				// assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
+				//assert.Equal(t, *testcase.expectedResponse, resBody)
+				assert.NotEqual(t, resBody.IngredientUUID, uuid.Nil)
+				assert.Equal(t, testcase.expectedResponse.IngredientName, resBody.IngredientName)
+				assert.Equal(t, testcase.expectedResponse.Category, resBody.Category)
+				assert.Equal(t, testcase.expectedResponse.DaysUntilExp, resBody.DaysUntilExp)
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
 			}
@@ -667,30 +749,34 @@ func TestDeleteIngredient(t *testing.T) {
 	}
 }
 
-func TestSearchIngredients(t *testing.T) {
+func TestListFridgeIngredients(t *testing.T) {
 	testcases := []struct {
-		name                          string
-		searchIngredientsOverrideFunc func(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error)
-		requestBody                   Ingredient
-		expectedResponse              []Ingredient
-		expectedStatus                int
+		name                              string
+		listFridgeIngredientsOverrideFunc func(ctx context.Context, id uuid.UUID) ([]store.FridgeIngredient, error)
+		requestBody                       string
+		expectedResponse                  []FridgeIngredient
+		expectedStatus                    int
 	}{
 		{
 			"happyPath",
 			nil,
-			Ingredient{IngredientName: "tuna"},
-			[]Ingredient{
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			[]FridgeIngredient{
 				{
-					IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-					IngredientName: "tuna",
-					Category:       "tuna kimbap",
-					DaysUntilExp:   3,
+					UserUUID:       uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					IngredientUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+					Amount:         3,
+					Unit:           "kg",
+					PurchasedDate:  time.Date(2023, time.March, 24, 15, 0, 0, 0, time.Now().Location()),
+					ExpirationDate: time.Date(2023, time.March, 24, 15, 0, 0, 0, time.Now().Location()),
 				},
 				{
-					IngredientUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-					IngredientName: "tuna",
-					Category:       "tuna sushi",
-					DaysUntilExp:   3,
+					UserUUID:       uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+					Amount:         2,
+					Unit:           "L",
+					PurchasedDate:  time.Date(2023, time.March, 24, 15, 0, 0, 0, time.Now().Location()),
+					ExpirationDate: time.Date(2023, time.March, 31, 15, 0, 0, 0, time.Now().Location()),
 				},
 			},
 			http.StatusOK,
@@ -698,16 +784,16 @@ func TestSearchIngredients(t *testing.T) {
 		{
 			"badRequest",
 			nil,
-			Ingredient{},
+			"maerong",
 			nil,
 			http.StatusBadRequest,
 		},
 		{
 			"internalServerError",
-			func(ctx context.Context, i store.Ingredient) ([]store.Ingredient, error) {
-				return []store.Ingredient{}, errors.New("internalServerError")
+			func(ctx context.Context, id uuid.UUID) ([]store.FridgeIngredient, error) {
+				return nil, errors.New("internalServerError")
 			},
-			Ingredient{IngredientName: "tuna"},
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
 			nil,
 			http.StatusInternalServerError,
 		},
@@ -715,31 +801,24 @@ func TestSearchIngredients(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			reqBody, err := json.Marshal(testcase.requestBody)
-			assert.NoError(t, err, "unexpected error marshalling the request body")
-
-			req := httptest.NewRequest(http.MethodPost, "/ingredients/search", bytes.NewBuffer(reqBody))
+			req := httptest.NewRequest(http.MethodGet, "/users/"+testcase.requestBody+"/fridge_ingredients", nil)
 			w := httptest.NewRecorder()
 
-			testServer.db = &mockstore.Mockstore{SearchIngredientsOverride: testcase.searchIngredientsOverrideFunc}
+			testServer.db = &mockstore.Mockstore{ListFridgeIngredientsOverride: testcase.listFridgeIngredientsOverrideFunc}
 			testServer.r.ServeHTTP(w, req)
 
 			assert.Equal(t, testcase.expectedStatus, w.Code)
 
 			if testcase.expectedResponse != nil {
-				var resBody []Ingredient
+				var resBody []FridgeIngredient
 
 				err := json.Unmarshal(w.Body.Bytes(), &resBody)
-				assert.NoError(t, err, "unexpected error unmarshaling the response body")
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
 				assert.Equal(t, len(testcase.expectedResponse), len(resBody))
 
 				for i := range testcase.expectedResponse {
 					assert.Equal(t, testcase.expectedResponse[i], resBody[i])
-					// assert.Equal(t, testcase.expectedResponse[i].IngredientUUID, resBody[i].IngredientUUID)
-					// assert.Equal(t, testcase.expectedResponse[i].IngredientName, resBody[i].IngredientName)
-					// assert.Equal(t, testcase.expectedResponse[i].Category, resBody[i].Category)
-					// assert.Equal(t, testcase.expectedResponse[i].DaysUntilExp, resBody[i].DaysUntilExp)
 				}
 			} else {
 				assert.Equal(t, 0, w.Body.Len())
@@ -748,104 +827,71 @@ func TestSearchIngredients(t *testing.T) {
 	}
 }
 
-func TestGetFridge(t *testing.T) {
+func TestCreateFridgeIngredient(t *testing.T) {
+	goodFridgeIngredient := FridgeIngredient{
+		UserUUID:       uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		IngredientUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+		Amount:         3,
+		Unit:           "kg",
+		PurchasedDate:  time.Now(),
+	}
+
+	badFridgeIngredient := FridgeIngredient{
+		UserUUID:       uuid.Nil,
+		IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		Amount:         3,
+		Unit:           "kg",
+		PurchasedDate:  time.Now(),
+	}
+
 	testcases := []struct {
-		name                  string
-		getFridgeOverrideFunc func(ctx context.Context, id uuid.UUID) (*store.Fridge, error)
-		requestBody           string
-		expectedResponse      *Fridge
-		expectedStatus        int
+		name                               string
+		getIngredientOverrideFunc          func(ctx context.Context, id uuid.UUID) (*store.Ingredient, error)
+		createFridgeIngredientOverrideFunc func(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error)
+		requestBody                        FridgeIngredient
+		expectedResponse                   *FridgeIngredient
+		expectedStatus                     int
 	}{
 		{
 			"happyPath",
 			nil,
-			"080b5f09-527b-4581-bb56-19adbfe50ebf",
-			&Fridge{
-				UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-				FridgeName: "jy fridge",
+			nil,
+			goodFridgeIngredient,
+			&FridgeIngredient{
+				UserUUID:       uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+				IngredientUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+				Amount:         3,
+				Unit:           "kg",
+				PurchasedDate:  time.Now(),
+				ExpirationDate: time.Now().Add(7 * 24 * time.Hour), //여기서의 time.Now()는 직전의 time.Now()랑 아주 약간 달라질 것이므로 expectedResponse 검사할 때 정확한 time.Time을 검사하는게 아니라 year, month, day만 검사하래..
 			},
 			http.StatusOK,
 		},
 		{
 			"badRequest",
 			nil,
-			"stupidshit",
+			nil,
+			badFridgeIngredient,
 			nil,
 			http.StatusBadRequest,
 		},
 		{
-			"internalServerError",
-			func(ctx context.Context, id uuid.UUID) (*store.Fridge, error) {
-				return nil, errors.New("internalServerError")
+			"internalServerError:getIngredient",
+			func(ctx context.Context, id uuid.UUID) (*store.Ingredient, error) {
+				return nil, errors.New("internalServerError:getIngredient")
 			},
-			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			nil,
+			goodFridgeIngredient,
 			nil,
 			http.StatusInternalServerError,
 		},
-	}
-
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/fridges/"+testcase.requestBody, nil)
-			w := httptest.NewRecorder()
-
-			testServer.db = &mockstore.Mockstore{GetFridgeOverride: testcase.getFridgeOverrideFunc}
-			testServer.r.ServeHTTP(w, req)
-
-			assert.Equal(t, testcase.expectedStatus, w.Code)
-
-			if testcase.expectedResponse != nil {
-				var resBody Fridge
-
-				err := json.Unmarshal(w.Body.Bytes(), &resBody)
-				assert.NoError(t, err, "unexpected error marshalling the response body")
-
-				assert.Equal(t, *testcase.expectedResponse, resBody)
-			} else {
-				assert.Equal(t, 0, w.Body.Len())
-			}
-		})
-	}
-}
-
-func TestCreateFridge(t *testing.T) {
-	goodFridge := Fridge{
-		UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-		FridgeName: "jy fridge",
-	}
-
-	badFridge := Fridge{
-		UserUUID:   uuid.Nil,
-		FridgeName: "",
-	}
-
-	testcases := []struct {
-		name                     string
-		createFridgeOverrideFunc func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
-		requestBody              Fridge
-		expectedResponse         *Fridge
-		expectedStatus           int
-	}{
 		{
-			"happyPath",
+			"internalServerError:createFridgeIngredient",
 			nil,
-			goodFridge,
-			&goodFridge,
-			http.StatusOK,
-		},
-		{
-			"badRequest",
-			nil,
-			badFridge,
-			nil,
-			http.StatusBadRequest,
-		},
-		{
-			"internalServerError",
-			func(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
-				return nil, errors.New("internalServerError")
+			func(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error) {
+				return nil, errors.New("internalServerError:createFridgeIngredient")
 			},
-			goodFridge,
+			goodFridgeIngredient,
 			nil,
 			http.StatusInternalServerError,
 		},
@@ -856,19 +902,229 @@ func TestCreateFridge(t *testing.T) {
 			reqBody, err := json.Marshal(testcase.requestBody)
 			assert.NoError(t, err, "unexpected error marshalling the request body")
 
-			req := httptest.NewRequest(http.MethodPost, "/fridges", bytes.NewBuffer(reqBody))
+			req := httptest.NewRequest(http.MethodPost, "/fridge_ingredients", bytes.NewBuffer(reqBody))
 			w := httptest.NewRecorder()
 
-			testServer.db = &mockstore.Mockstore{CreateFridgeOverride: testcase.createFridgeOverrideFunc}
+			testServer.db = &mockstore.Mockstore{
+				GetIngredientOverride:          testcase.getIngredientOverrideFunc,
+				CreateFridgeIngredientOverride: testcase.createFridgeIngredientOverrideFunc}
 			testServer.r.ServeHTTP(w, req)
 
 			assert.Equal(t, testcase.expectedStatus, w.Code)
 
 			if testcase.expectedResponse != nil {
-				var resBody Fridge
+				var resBody FridgeIngredient
 
 				err := json.Unmarshal(w.Body.Bytes(), &resBody)
-				assert.NoError(t, err, "unexpected error marshalling the response body")
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.Equal(t, testcase.expectedResponse.PurchasedDate.Year(), resBody.PurchasedDate.Year())
+				assert.Equal(t, testcase.expectedResponse.PurchasedDate.Month(), resBody.PurchasedDate.Month())
+				assert.Equal(t, testcase.expectedResponse.PurchasedDate.Day(), resBody.PurchasedDate.Day()) //이거 한줄로 줄이는 방법 없을까..
+
+				assert.Equal(t, testcase.expectedResponse.ExpirationDate.Year(), resBody.ExpirationDate.Year())
+				assert.Equal(t, testcase.expectedResponse.ExpirationDate.Month(), resBody.ExpirationDate.Month())
+				assert.Equal(t, testcase.expectedResponse.ExpirationDate.Day(), resBody.ExpirationDate.Day())
+
+				assert.Equal(t, testcase.expectedResponse.UserUUID, resBody.UserUUID)
+				assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
+				assert.Equal(t, testcase.expectedResponse.Amount, resBody.Amount)
+				assert.Equal(t, testcase.expectedResponse.Amount, resBody.Amount)
+				assert.Equal(t, testcase.expectedResponse.Unit, resBody.Unit)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestUpdateFridgeIngredient(t *testing.T) {
+	goodFridgeIngredient := FridgeIngredient{
+		UserUUID:       uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+		IngredientUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+		Amount:         5,
+		Unit:           "lb",
+		PurchasedDate:  time.Now(),
+	}
+
+	badFridgeIngredient := FridgeIngredient{
+		UserUUID:       uuid.Nil,
+		IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		Amount:         5,
+		Unit:           "kg",
+		PurchasedDate:  time.Now(),
+	}
+
+	testcases := []struct {
+		name                               string
+		updateFridgeIngredientOverrideFunc func(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error)
+		requestBody                        FridgeIngredient
+		expectedResponse                   *FridgeIngredient
+		expectedStatus                     int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodFridgeIngredient,
+			&goodFridgeIngredient,
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			badFridgeIngredient,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, f store.FridgeIngredient) (*store.FridgeIngredient, error) {
+				return nil, errors.New("internalServerError")
+			},
+			goodFridgeIngredient,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/fridge_ingredients/"+testcase.requestBody.UserUUID.String(), bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{UpdateFridgeIngredientOverride: testcase.updateFridgeIngredientOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedResponse != nil {
+				var resBody FridgeIngredient
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.Equal(t, testcase.expectedResponse.PurchasedDate.Year(), resBody.PurchasedDate.Year())
+				assert.Equal(t, testcase.expectedResponse.PurchasedDate.Month(), resBody.PurchasedDate.Month())
+				assert.Equal(t, testcase.expectedResponse.PurchasedDate.Day(), resBody.PurchasedDate.Day()) //이거 한줄로 줄이는 방법 없을까..
+
+				assert.Equal(t, testcase.expectedResponse.ExpirationDate.Year(), resBody.ExpirationDate.Year())
+				assert.Equal(t, testcase.expectedResponse.ExpirationDate.Month(), resBody.ExpirationDate.Month())
+				assert.Equal(t, testcase.expectedResponse.ExpirationDate.Day(), resBody.ExpirationDate.Day())
+
+				assert.Equal(t, testcase.expectedResponse.UserUUID, resBody.UserUUID)
+				assert.Equal(t, testcase.expectedResponse.IngredientUUID, resBody.IngredientUUID)
+				assert.Equal(t, testcase.expectedResponse.Amount, resBody.Amount)
+				assert.Equal(t, testcase.expectedResponse.Amount, resBody.Amount)
+				assert.Equal(t, testcase.expectedResponse.Unit, resBody.Unit)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestDeleteFridgeIngredient(t *testing.T) {
+	testcases := []struct {
+		name                               string
+		deleteFridgeIngredientOverrideFunc func(ctx context.Context, uid uuid.UUID, fid uuid.UUID) error
+		uid                                string
+		fid                                string
+		expectedStatus                     int
+	}{
+		{
+			"happyPath",
+			nil,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			"ffff7c73-52b0-4e3d-bf3f-0c26785ef972",
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			"",
+			"",
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, uid uuid.UUID, fid uuid.UUID) error {
+				return errors.New("internalServerError")
+			},
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			"ffff7c73-52b0-4e3d-bf3f-0c26785ef972",
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodDelete, "/users/"+testcase.uid+"/fridge_ingredients/"+testcase.fid, nil)
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{DeleteFridgeIngredientOverride: testcase.deleteFridgeIngredientOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestGetRecipe(t *testing.T) {
+	testcases := []struct {
+		name                  string
+		getRecipeOverrideFunc func(ctx context.Context, id uuid.UUID) (*store.Recipe, error)
+		requestBody           string
+		expectedResponse      *Recipe
+		expectedStatus        int
+	}{
+		{
+			"happyPath",
+			nil,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			&Recipe{
+				RecipeUUID: uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+				UserUUID:   uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+				RecipeName: "kimchi fried rice",
+				Category:   "Korean",
+			},
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			"maerong",
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, id uuid.UUID) (*store.Recipe, error) {
+				return nil, errors.New("internalServerError")
+			},
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/recipes/"+testcase.requestBody, nil)
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{GetRecipeOverride: testcase.getRecipeOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedResponse != nil {
+				var resBody Recipe
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
 				assert.Equal(t, *testcase.expectedResponse, resBody)
 			} else {
@@ -878,79 +1134,366 @@ func TestCreateFridge(t *testing.T) {
 	}
 }
 
-func TestUpdateFridge(t *testing.T) {
-	goodFridge := Fridge{
-		UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
-		FridgeName: "jy fridge",
-	}
-
-	badFridge := Fridge{
-		UserUUID:   uuid.Nil,
-		FridgeName: "",
-	}
-
+func TestListRecipes(t *testing.T) {
 	testcases := []struct {
-		name                     string
-		updateFridgeOverrideFunc func(ctx context.Context, f store.Fridge) (*store.Fridge, error)
-		requestBody              Fridge
-		expectedResponse         *Fridge
-		expectedStatus           int
+		name                    string
+		listRecipesOverrideFunc func(ctx context.Context, id uuid.UUID) ([]store.Recipe, error)
+		requestBody             string
+		expectedResponse        []Recipe
+		expectedStatus          int
 	}{
 		{
 			"happyPath",
 			nil,
-			goodFridge,
-			&goodFridge,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
+			[]Recipe{
+				{
+					RecipeUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+					UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					RecipeName: "kimchi jeon",
+					Category:   "Korean",
+				},
+				{
+					RecipeUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+					UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					RecipeName: "kimchi mandu",
+					Category:   "Korean",
+				},
+			},
 			http.StatusOK,
 		},
 		{
 			"badRequest",
 			nil,
-			badFridge,
+			"babo",
 			nil,
 			http.StatusBadRequest,
 		},
 		{
 			"internalServerError",
-			func(ctx context.Context, f store.Fridge) (*store.Fridge, error) {
+			func(ctx context.Context, id uuid.UUID) ([]store.Recipe, error) {
 				return nil, errors.New("internalServerError")
 			},
-			goodFridge,
+			"080b5f09-527b-4581-bb56-19adbfe50ebf",
 			nil,
 			http.StatusInternalServerError,
 		},
 	}
 
 	for _, testcase := range testcases {
-		reqBody, err := json.Marshal(testcase.requestBody)
-		assert.NoError(t, err, "unexpected error marshalling the request body")
+		t.Run(testcase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/users/"+testcase.requestBody+"/recipes", nil)
+			w := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodPost, "/fridges/"+testcase.requestBody.UserUUID.String(), bytes.NewBuffer(reqBody))
-		w := httptest.NewRecorder()
+			testServer.db = &mockstore.Mockstore{ListRecipesOverride: testcase.listRecipesOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
 
-		testServer.db = &mockstore.Mockstore{UpdateFridgeOverride: testcase.updateFridgeOverrideFunc}
-		testServer.r.ServeHTTP(w, req)
+			assert.Equal(t, testcase.expectedStatus, w.Code)
 
-		assert.Equal(t, testcase.expectedStatus, w.Code)
+			if testcase.expectedResponse != nil {
+				var resBody []Recipe
 
-		if testcase.expectedResponse != nil {
-			var resBody Fridge
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
 
-			err := json.Unmarshal(w.Body.Bytes(), &resBody)
-			assert.NoError(t, err, "unexpected error unmarshalling the response body")
+				assert.Equal(t, len(testcase.expectedResponse), len(resBody))
 
-			assert.Equal(t, *testcase.expectedResponse, resBody)
-		} else {
-			assert.Equal(t, 0, w.Body.Len())
-		}
+				for i := range testcase.expectedResponse {
+					assert.Equal(t, testcase.expectedResponse[i], resBody[i])
+				}
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
 	}
 }
 
-func TestDeleteFridge(t *testing.T) {
+func TestSearchRecipes(t *testing.T) {
+	goodRecipe := SearchRecipes{
+		RecipeName: "salmon nigiri",
+	}
+
+	badRecipe := SearchRecipes{}
+
+	testcases := []struct {
+		name                      string
+		searchRecipesOverrideFunc func(ctx context.Context, r store.SearchRecipes) ([]store.Recipe, error)
+		requestBody               SearchRecipes
+		expectedResponse          []Recipe
+		expectedStatus            int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodRecipe,
+			[]Recipe{
+				{
+					RecipeUUID: uuid.MustParse("ffff7c73-52b0-4e3d-bf3f-0c26785ef972"),
+					UserUUID:   uuid.MustParse("080b5f09-527b-4581-bb56-19adbfe50ebf"),
+					RecipeName: "salmon nigiri",
+					Category:   "Japanese",
+				},
+				{
+					RecipeUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+					UserUUID:   uuid.MustParse("ebe96725-44ef-47ee-979f-8baf823d7283"),
+					RecipeName: "salmon nigiri",
+					Category:   "Japanese",
+				},
+			},
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			badRecipe,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, r store.SearchRecipes) ([]store.Recipe, error) {
+				return nil, errors.New("internalServerError")
+			},
+			goodRecipe,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/recipes/search", bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{SearchRecipesOverride: testcase.searchRecipesOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedResponse != nil {
+				var resBody []Recipe
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.Equal(t, len(testcase.expectedResponse), len(resBody))
+
+				for i := range testcase.expectedResponse {
+					assert.Equal(t, testcase.expectedResponse[i], resBody[i])
+				}
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestCreateRecipe(t *testing.T) {
+	goodRecipe := Recipe{
+		UserUUID:   uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		RecipeName: "kimchi fried rice",
+		Category:   "Korean",
+		Ingredients: []RecipeIngredient{
+			{
+				IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99b"),
+				Amount:         1,
+				Unit:           "kg",
+			},
+			{
+				IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99b"),
+				Amount:         1,
+				Unit:           "unit",
+			},
+		},
+		Instructions: []RecipeInstruction{
+			{
+				StepNum:     1,
+				Instruction: "Chop kimchi, onion and pork belly",
+			},
+			{
+				StepNum:     2,
+				Instruction: "grill the pan and put some oil on it",
+			},
+		},
+	}
+
+	badRecipe := Recipe{
+		UserUUID:     uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		RecipeName:   "kimchi fried rice",
+		Category:     "",
+		Ingredients:  []RecipeIngredient{},
+		Instructions: []RecipeInstruction{},
+	}
+
 	testcases := []struct {
 		name                     string
-		deleteFridgeOverrideFunc func(ctx context.Context, id uuid.UUID) error
-		reqBody                  string
+		createRecipeOverrideFunc func(ctx context.Context, r store.Recipe) (*store.Recipe, error)
+		requestBody              Recipe
+		expectedReponse          *Recipe
+		expectedStatus           int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodRecipe,
+			&goodRecipe, //RecipeUUID 필드가 핸들러에서 돌아오겠지만(w.Body()), 내가 여기서 expected response로 체크하고 싶은건 내맘대로 쓸 수 있다. RecipeUUID는 밑에서 그냥 uuid.Nil이 아닌지만 체크하고, 나머지 필드들만 값이 내가 예상한거랑 같은지 보는것!
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			badRecipe,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, r store.Recipe) (*store.Recipe, error) {
+				return nil, errors.New("internalServerError")
+			},
+			goodRecipe,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/recipes", bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{CreateRecipeOverride: testcase.createRecipeOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedReponse != nil {
+				var resBody Recipe
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.NotEqual(t, resBody.RecipeUUID, uuid.Nil)
+				assert.Equal(t, testcase.expectedReponse.UserUUID, resBody.UserUUID)
+				assert.Equal(t, testcase.expectedReponse.RecipeName, resBody.RecipeName)
+				assert.Equal(t, testcase.expectedReponse.Category, resBody.Category)
+				assert.Equal(t, testcase.expectedReponse.Ingredients, resBody.Ingredients)
+				assert.Equal(t, testcase.expectedReponse.Instructions, resBody.Instructions)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestUpdateRecipe(t *testing.T) {
+	goodRecipe := Recipe{
+		RecipeUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99d"),
+		UserUUID:   uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		RecipeName: "kimchi fried rice",
+		Category:   "Korean",
+		Ingredients: []RecipeIngredient{
+			{
+				IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99b"),
+				Amount:         1,
+				Unit:           "kg",
+			},
+			{
+				IngredientUUID: uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99b"),
+				Amount:         1,
+				Unit:           "unit",
+			},
+		},
+		Instructions: []RecipeInstruction{
+			{
+				StepNum:     1,
+				Instruction: "Chop kimchi, onion and pork belly",
+			},
+			{
+				StepNum:     2,
+				Instruction: "grill the pan and put some oil on it",
+			},
+		},
+	}
+
+	badRecipe := Recipe{
+		UserUUID:     uuid.MustParse("2c98fff4-7ccc-4536-8259-67a88380e99c"),
+		RecipeName:   "kimchi fried rice",
+		Category:     "",
+		Ingredients:  []RecipeIngredient{},
+		Instructions: []RecipeInstruction{},
+	}
+
+	testcases := []struct {
+		name                     string
+		updateRecipeOverrideFunc func(ctx context.Context, r store.Recipe) (*store.Recipe, error)
+		requestBody              Recipe
+		expectedReponse          *Recipe
+		expectedStatus           int
+	}{
+		{
+			"happyPath",
+			nil,
+			goodRecipe,
+			&goodRecipe,
+			http.StatusOK,
+		},
+		{
+			"badRequest",
+			nil,
+			badRecipe,
+			nil,
+			http.StatusBadRequest,
+		},
+		{
+			"internalServerError",
+			func(ctx context.Context, r store.Recipe) (*store.Recipe, error) {
+				return nil, errors.New("internalServerError")
+			},
+			goodRecipe,
+			nil,
+			http.StatusInternalServerError,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			reqBody, err := json.Marshal(testcase.requestBody)
+			assert.NoError(t, err, "unexpected error marshalling the request body")
+
+			req := httptest.NewRequest(http.MethodPost, "/recipes/"+testcase.requestBody.RecipeUUID.String(), bytes.NewBuffer(reqBody))
+			w := httptest.NewRecorder()
+
+			testServer.db = &mockstore.Mockstore{UpdateRecipeOverride: testcase.updateRecipeOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
+
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+
+			if testcase.expectedReponse != nil {
+				var resBody Recipe
+
+				err := json.Unmarshal(w.Body.Bytes(), &resBody)
+				assert.NoError(t, err, "unexpected error unmarshalling the response body")
+
+				assert.Equal(t, *testcase.expectedReponse, resBody)
+			} else {
+				assert.Equal(t, 0, w.Body.Len())
+			}
+		})
+	}
+}
+
+func TestDeleteRecipe(t *testing.T) {
+	testcases := []struct {
+		name                     string
+		deleteRecipeOverrideFunc func(ctx context.Context, id uuid.UUID) error
+		requestBody              string
 		expectedStatus           int
 	}{
 		{
@@ -962,7 +1505,7 @@ func TestDeleteFridge(t *testing.T) {
 		{
 			"badRequest",
 			nil,
-			"baboya",
+			"maerong",
 			http.StatusBadRequest,
 		},
 		{
@@ -976,12 +1519,14 @@ func TestDeleteFridge(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		req := httptest.NewRequest(http.MethodDelete, "/fridges/"+testcase.reqBody, nil)
-		w := httptest.NewRecorder()
+		t.Run(testcase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodDelete, "/recipes/"+testcase.requestBody, nil)
+			w := httptest.NewRecorder()
 
-		testServer.db = &mockstore.Mockstore{DeleteFridgeOverride: testcase.deleteFridgeOverrideFunc}
-		testServer.r.ServeHTTP(w, req)
+			testServer.db = &mockstore.Mockstore{DeleteRecipeOverride: testcase.deleteRecipeOverrideFunc}
+			testServer.r.ServeHTTP(w, req)
 
-		assert.Equal(t, testcase.expectedStatus, w.Code)
+			assert.Equal(t, testcase.expectedStatus, w.Code)
+		})
 	}
 }
